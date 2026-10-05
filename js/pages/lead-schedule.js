@@ -22,6 +22,8 @@ async function renderPage(profile) {
   const app = document.getElementById('app');
   app.innerHTML = `<div class="p-8 text-center text-slate-500 font-medium">Loading schedule matrix...</div>`;
 
+  try {
+
   // Fetch Month status
   let { data: monthRow } = await supabase
     .from('schedule_months')
@@ -419,6 +421,10 @@ async function renderPage(profile) {
       });
     });
   });
+  } catch (err) {
+    console.error(err);
+    app.innerHTML = `<div class="p-8 text-center text-rose-600 font-bold">Error loading schedule matrix: ${err.message || err}</div>`;
+  }
 }
 
 function openDrawer(task, profile, technicians, shiftRows) {

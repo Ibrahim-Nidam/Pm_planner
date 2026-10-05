@@ -21,6 +21,8 @@ async function renderPage(profile) {
   const app = document.getElementById('app');
   app.innerHTML = `<div class="p-8 text-center text-slate-500 font-medium">Loading roster grid...</div>`;
 
+  try {
+
   const [year, month] = currentMonthStr.split('-').map(Number);
   const daysInMonth = new Date(year, month, 0).getDate();
   const startDate = `${currentMonthStr}`;
@@ -295,6 +297,10 @@ async function renderPage(profile) {
       });
     });
   });
+  } catch (err) {
+    console.error(err);
+    app.innerHTML = `<div class="p-8 text-center text-rose-600 font-bold">Error loading roster grid: ${err.message || err}</div>`;
+  }
 }
 
 init();

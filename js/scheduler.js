@@ -9,14 +9,19 @@ export function getCycleShiftForDate(profile, dateStr) {
     return 'rest';
   }
 
-  const [aYear, aMonth, aDay] = profile.cycle_anchor_date.split('-').map(Number);
+  const cleanAnchor = String(profile.cycle_anchor_date).substring(0, 10);
+  const cleanDate = String(dateStr).substring(0, 10);
+
+  const [aYear, aMonth, aDay] = cleanAnchor.split('-').map(Number);
   const anchorUtc = Date.UTC(aYear, aMonth - 1, aDay);
 
-  const [year, month, day] = dateStr.split('-').map(Number);
+  const [year, month, day] = cleanDate.split('-').map(Number);
   const currentUtc = Date.UTC(year, month - 1, day);
 
+  if (isNaN(anchorUtc) || isNaN(currentUtc)) return 'rest';
+
   const diffDays = Math.round((currentUtc - anchorUtc) / (1000 * 60 * 60 * 24));
-  let cyclePos = (profile.cycle_anchor_index + (diffDays % 4)) % 4;
+  let cyclePos = (Number(profile.cycle_anchor_index) + (diffDays % 4)) % 4;
   if (cyclePos < 0) cyclePos += 4;
 
   if (cyclePos === 0) return 'day';
@@ -32,7 +37,8 @@ export function nightsFromCycle(profile, monthStartStr) {
     return [];
   }
 
-  const [year, month] = monthStartStr.split('-').map(Number);
+  const cleanMonthStart = String(monthStartStr).substring(0, 10);
+  const [year, month] = cleanMonthStart.split('-').map(Number);
   const daysInMonth = new Date(year, month, 0).getDate();
   const nights = [];
 
@@ -50,7 +56,8 @@ export function nightsFromCycle(profile, monthStartStr) {
  * Returns the Monday-Sunday week start (ISO date string) for a given date.
  */
 function getWeekStart(dateStr) {
-  const d = new Date(dateStr);
+  const cleanDate = String(dateStr).substring(0, 10);
+  const d = new Date(cleanDate);
   const day = d.getUTCDay(); // 0 is Sun, 1 is Mon...
   const diff = d.getUTCDate() - day + (day === 0 ? -6 : 1); // adjust when day is Sunday
   const monday = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), diff));
