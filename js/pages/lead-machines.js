@@ -7,6 +7,11 @@ let allMachines = [];
 let allTechnicians = [];
 let filterQuery = '';
 
+const locationLabels = {
+  'terminal_1': 'Terminal 1',
+  'transit': 'Transit'
+};
+
 async function init() {
   const guard = await requireRole('team_lead');
   if (!guard) return;
@@ -43,9 +48,10 @@ async function renderPage(profile) {
   // Filter machines
   const filtered = allMachines.filter(m => {
     const q = filterQuery.toLowerCase();
+    const locLabel = locationLabels[m.location] || m.location || '';
     return (
       m.code.toLowerCase().includes(q) ||
-      (m.location && m.location.toLowerCase().includes(q)) ||
+      locLabel.toLowerCase().includes(q) ||
       (m.line && m.line.toLowerCase().includes(q)) ||
       (m.profiles?.full_name && m.profiles.full_name.toLowerCase().includes(q))
     );
@@ -54,10 +60,12 @@ async function renderPage(profile) {
   // Table rows HTML
   const rowsHtml = filtered.map(m => {
     const techName = m.profiles?.full_name || 'Unassigned';
+    const locText = locationLabels[m.location] || m.location || '—';
+
     return `
       <tr class="border-b border-slate-100 hover:bg-slate-50/50 transition-all">
         <td class="p-4 font-bold text-sm text-slate-900">${m.code}</td>
-        <td class="p-4 text-xs font-medium text-slate-600">${m.location || '—'}</td>
+        <td class="p-4 text-xs font-medium text-slate-600">${locText}</td>
         <td class="p-4 text-xs font-medium text-slate-600">${m.line || '—'}</td>
         <td class="p-4 text-xs font-bold text-slate-800">${m.pm_per_month} PM/mo</td>
         <td class="p-4 text-xs font-medium text-slate-900">${techName}</td>
@@ -130,14 +138,18 @@ async function renderPage(profile) {
             </div>
             <div>
               <label class="block text-[10px] font-bold uppercase text-slate-500 mb-1">Location</label>
-              <input id="machine-location" type="text" placeholder="e.g. Terminal 1" class="w-full p-3 bg-slate-100 rounded-xl text-sm font-medium focus:outline-none">
+              <select id="machine-location" class="w-full p-3 bg-slate-100 rounded-xl text-sm font-medium focus:outline-none">
+                <option value="">-- Unassigned --</option>
+                <option value="terminal_1">Terminal 1</option>
+                <option value="transit">Transit</option>
+              </select>
             </div>
           </div>
 
           <div class="grid grid-cols-2 gap-3">
             <div>
               <label class="block text-[10px] font-bold uppercase text-slate-500 mb-1">Line / Area</label>
-              <input id="machine-line" type="text" placeholder="e.g. Line 1" class="w-full p-3 bg-slate-100 rounded-xl text-sm font-medium focus:outline-none">
+              <input id="machine-line" type="text" placeholder="e.g. L1" class="w-full p-3 bg-slate-100 rounded-xl text-sm font-medium focus:outline-none">
             </div>
             <div>
               <label class="block text-[10px] font-bold uppercase text-slate-500 mb-1">PM Count / Month *</label>
@@ -250,12 +262,13 @@ async function renderPage(profile) {
     e.preventDefault();
     const id = document.getElementById('machine-id').value;
     const code = document.getElementById('machine-code').value.trim();
-    const location = document.getElementById('machine-location').value.trim();
-    const line = document.getElementById('machine-line').value.trim();
+    const rawLoc = document.getElementById('machine-location').value;
+    const location = rawLoc || null;
+    const line = document.getElementById('machine-line').value.trim() || null;
     const pm_per_month = parseInt(document.getElementById('machine-pm-count').value, 10);
     const technician_id = document.getElementById('machine-tech-id').value || null;
-    const sort_order = parseInt(document.getElementById('machine-sort-order').value, 10);
-    const notes = document.getElementById('machine-notes').value.trim();
+    const sort_order = parseInt(document.getElementById('machine-sort-order').value, 10) || 10;
+    const notes = document.getElementById('machine-notes').value.trim() || null;
     const is_active = document.getElementById('machine-is-active').checked;
 
     // Check if technician changed on existing machine
@@ -282,8 +295,7 @@ async function renderPage(profile) {
       technician_id,
       sort_order,
       notes,
-      is_active,
-      updated_at: new Date().toISOString()
+      is_active
     };
 
     try {
