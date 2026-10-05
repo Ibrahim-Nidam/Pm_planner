@@ -61,6 +61,7 @@ async function renderPage(profile) {
   }
 
   // Rows HTML
+  const anchorTypes = { 0: 'DAY (D)', 1: 'NIGHT (N)', 2: 'REST 1 (R1)', 3: 'REST 2 (R2)' };
   const rowsHtml = allTechnicians.map(tech => {
     const techMachines = allMachines.filter(m => m.technician_id === tech.id);
     const machineBadges = techMachines.map(m => `
@@ -68,7 +69,7 @@ async function renderPage(profile) {
     `).join('');
 
     const anchorDateFormatted = tech.cycle_anchor_date ? formatDateDDMMYYYY(tech.cycle_anchor_date) : '01/10/2026';
-    const anchorType = (tech.cycle_anchor_shift_type || 'night').toUpperCase();
+    const anchorType = anchorTypes[tech.cycle_anchor_index] || 'NIGHT (N)';
 
     return `
       <tr class="border-b border-slate-100 hover:bg-slate-50/50 transition-all">
@@ -205,7 +206,8 @@ async function renderPage(profile) {
       document.getElementById('tech-id').value = tech.id;
       document.getElementById('tech-full-name').value = tech.full_name;
       document.getElementById('tech-anchor-date').value = tech.cycle_anchor_date || '2026-10-01';
-      document.getElementById('tech-anchor-type').value = tech.cycle_anchor_shift_type || 'night';
+      const indexToType = { 0: 'day', 1: 'night', 2: 'rest1', 3: 'rest2' };
+      document.getElementById('tech-anchor-type').value = indexToType[tech.cycle_anchor_index] || 'night';
 
       // Select assigned machines
       const techMachineIds = new Set(allMachines.filter(m => m.technician_id === tech.id).map(m => m.id));
@@ -312,9 +314,7 @@ async function renderPage(profile) {
           .update({
             full_name,
             cycle_anchor_date,
-            cycle_anchor_shift_type,
-            cycle_anchor_index: anchor_index,
-            updated_at: new Date().toISOString()
+            cycle_anchor_index: anchor_index
           })
           .eq('id', id);
 

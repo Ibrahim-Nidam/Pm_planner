@@ -1,4 +1,4 @@
--- 005_admin_rpcs.sql — Database RPC functions for technician management supporting full 4-day shift cycle (Day, Night, Rest 1, Rest 2).
+-- 005_admin_rpcs.sql — Database RPC functions for technician management matching public.profiles schema.
 
 -- 1. admin_create_technician RPC
 create or replace function public.admin_create_technician(
@@ -11,6 +11,7 @@ create or replace function public.admin_create_technician(
 returns jsonb
 language plpgsql
 security definer
+set search_path = public, extensions, auth
 as $$
 declare
   v_user_id uuid := gen_random_uuid();
@@ -61,19 +62,19 @@ begin
     raw_app_meta_data, raw_user_meta_data, created_at, updated_at
   ) values (
     v_user_id, '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated',
-    v_email, crypt(v_default_pwd, gen_salt('bf')), now(),
+    v_email, extensions.crypt(v_default_pwd, extensions.gen_salt('bf')), now(),
     '{"provider":"email","providers":["email"]}'::jsonb,
     jsonb_build_object('full_name', p_full_name, 'role', 'technician'),
     now(), now()
   );
 
-  -- Insert Profile
+  -- Insert Profile (only columns present in public.profiles schema)
   insert into public.profiles (
     id, username, full_name, role, cycle_anchor_date, cycle_anchor_index,
-    cycle_anchor_shift_type, must_change_password, is_active
+    must_change_password, is_active
   ) values (
     v_user_id, v_username, p_full_name, 'technician', p_cycle_anchor_date,
-    v_anchor_index, p_cycle_anchor_shift_type, true, true
+    v_anchor_index, true, true
   );
 
   -- Write Audit Log
@@ -93,6 +94,7 @@ create or replace function public.admin_reset_password(p_user_id uuid)
 returns jsonb
 language plpgsql
 security definer
+set search_path = public, extensions, auth
 as $$
 declare
   v_caller_role text;
@@ -103,7 +105,7 @@ begin
     raise exception 'Forbidden: Active Team Lead role required';
   end if;
 
-  update auth.users set encrypted_password = crypt(v_default_pwd, gen_salt('bf')) where id = p_user_id;
+  update auth.users set encrypted_password = extensions.crypt(v_default_pwd, extensions.gen_salt('bf')) where id = p_user_id;
   update public.profiles set must_change_password = true, updated_at = now() where id = p_user_id;
 
   insert into public.audit_log (actor_id, action, details)
@@ -118,6 +120,7 @@ create or replace function public.admin_set_active(p_user_id uuid, p_is_active b
 returns jsonb
 language plpgsql
 security definer
+set search_path = public, extensions, auth
 as $$
 declare
   v_caller_role text;
@@ -131,7 +134,7 @@ begin
     raise exception 'Cannot alter your own active status';
   end if;
 
-  update public.profiles set is_active = p_is_active, updated_at = now() where id = p_user_id;
+  update public.profiles set is_active = p_is_active where id = p_user_id;
 
   insert into public.audit_log (actor_id, action, details)
   values (auth.uid(), 'user.set_active', jsonb_build_object('target_user_id', p_user_id, 'is_active', p_is_active));
