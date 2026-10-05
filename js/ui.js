@@ -94,12 +94,10 @@ export function showToast(message, type = 'info') {
 
 export function renderMonthSelector(containerEl, currentMonthStr, onChange) {
   if (!containerEl) return;
-  // currentMonthStr format: "YYYY-MM-01"
   const parts = currentMonthStr.split('-');
   const year = parseInt(parts[0], 10);
-  const month = parseInt(parts[1], 10); // 1 to 12
+  const month = parseInt(parts[1], 10);
 
-  // Previous month
   let prevYear = year;
   let prevMonth = month - 1;
   if (prevMonth < 1) {
@@ -108,7 +106,6 @@ export function renderMonthSelector(containerEl, currentMonthStr, onChange) {
   }
   const prevDate = `${prevYear}-${String(prevMonth).padStart(2, '0')}-01`;
 
-  // Next month
   let nextYear = year;
   let nextMonth = month + 1;
   if (nextMonth > 12) {
@@ -130,4 +127,75 @@ export function renderMonthSelector(containerEl, currentMonthStr, onChange) {
 
   containerEl.querySelector('#prev-month-btn').addEventListener('click', () => onChange(prevDate));
   containerEl.querySelector('#next-month-btn').addEventListener('click', () => onChange(nextDate));
+}
+
+export function openPhotoLightbox(photoUrl, title = "PM Evidence Photo") {
+  const existing = document.getElementById('lightbox-modal');
+  if (existing) existing.remove();
+
+  const modal = document.createElement('div');
+  modal.id = 'lightbox-modal';
+  modal.className = 'fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-sm flex flex-col items-center justify-between p-4 sm:p-6 animate-fadeIn';
+
+  modal.innerHTML = `
+    <!-- Top Bar -->
+    <div class="w-full max-w-5xl flex items-center justify-between text-white py-2">
+      <div class="flex items-center gap-3">
+        <span class="font-bold text-sm sm:text-base">${title}</span>
+        <span class="text-xs text-slate-400 font-medium hidden sm:inline">(Click image to toggle Zoom)</span>
+      </div>
+      <div class="flex items-center gap-3">
+        <a href="${photoUrl}" download="pm-evidence.jpg" target="_blank" rel="noopener noreferrer" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs sm:text-sm font-semibold rounded-lg shadow-sm transition-all flex items-center gap-2 cursor-pointer">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+          Download Photo
+        </a>
+        <button id="close-lightbox-btn" class="p-2 text-slate-400 hover:text-white font-bold text-lg rounded-lg hover:bg-slate-800 transition-all cursor-pointer" title="Close (Esc)">✕</button>
+      </div>
+    </div>
+
+    <!-- Center Image Container -->
+    <div class="flex-1 w-full max-w-5xl flex items-center justify-center overflow-auto py-4 cursor-zoom-in" id="lightbox-img-wrapper">
+      <img id="lightbox-img" src="${photoUrl}" alt="${title}" class="max-h-[80vh] max-w-full object-contain rounded-xl shadow-2xl transition-transform duration-200 select-none">
+    </div>
+
+    <!-- Footer Hint -->
+    <div class="text-xs text-slate-400 font-medium py-1">
+      Press <kbd class="px-1.5 py-0.5 bg-slate-800 rounded text-slate-300 font-mono">Esc</kbd> or click outside to close
+    </div>
+  `;
+
+  document.body.appendChild(modal);
+
+  const img = modal.querySelector('#lightbox-img');
+  const imgWrapper = modal.querySelector('#lightbox-img-wrapper');
+  let isZoomed = false;
+
+  imgWrapper.addEventListener('click', (e) => {
+    if (e.target === img) {
+      isZoomed = !isZoomed;
+      if (isZoomed) {
+        img.classList.remove('max-h-[80vh]', 'max-w-full');
+        img.classList.add('scale-150', 'my-auto');
+        imgWrapper.classList.remove('cursor-zoom-in');
+        imgWrapper.classList.add('cursor-zoom-out');
+      } else {
+        img.classList.add('max-h-[80vh]', 'max-w-full');
+        img.classList.remove('scale-150', 'my-auto');
+        imgWrapper.classList.remove('cursor-zoom-out');
+        imgWrapper.classList.add('cursor-zoom-in');
+      }
+    } else {
+      modal.remove();
+    }
+  });
+
+  modal.querySelector('#close-lightbox-btn').addEventListener('click', () => modal.remove());
+
+  const handleKeyDown = (e) => {
+    if (e.key === 'Escape') {
+      modal.remove();
+      document.removeEventListener('keydown', handleKeyDown);
+    }
+  };
+  document.addEventListener('keydown', handleKeyDown);
 }

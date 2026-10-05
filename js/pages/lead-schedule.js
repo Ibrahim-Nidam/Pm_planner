@@ -2,7 +2,7 @@
 import { requireRole } from '../guard.js';
 import { supabase } from '../supabase-client.js';
 import { formatDateDDMMYYYY, formatTime24h, formatDurationMinutes } from '../time.js';
-import { renderTopBar, renderStatusBadge, renderMonthSelector, showToast } from '../ui.js';
+import { renderTopBar, renderStatusBadge, renderMonthSelector, showToast, openPhotoLightbox } from '../ui.js';
 import { generateSchedule, nightsFromCycle, getCycleShiftForDate, toleranceDate } from '../scheduler.js';
 
 let currentMonthStr = '2026-10-01'; // default to acceptance test month
@@ -23,424 +23,428 @@ async function renderPage(profile) {
   app.innerHTML = `<div class="p-8 text-center text-slate-500 font-medium">Loading schedule matrix...</div>`;
 
   try {
+    // 1. Fetch current month record
+    let { data: monthRow } = await supabase
+      .from('schedule_months')
+      .select('*')
+      .eq('month', currentMonthStr)
+      .maybeSingle();
 
-  // Fetch Month status
-  let { data: monthRow } = await supabase
-    .from('schedule_months')
-    .select('*')
-    .eq('month', currentMonthStr)
-    .maybeSingle();
+    const status = monthRow ? monthRow.status : 'draft';
 
-  // Fetch machines in sort_order
-  const { data: machines } = await supabase
-    .from('machines')
-    .select('*, profiles(id, full_name, username)')
-    .order('sort_order');
+    // 2. Fetch machines
+    const { data: machines } = await supabase
+      .from('machines')
+      .select('*')
+      .order('sort_order', { ascending: true });
 
-  // Fetch technicians
-  const { data: technicians } = await supabase
-    .from('profiles')
-    .select('*')
-    .eq('role', 'technician')
-    .order('full_name');
+    // 3. Fetch technicians
+    const { data: technicians } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('role', 'technician')
+      .order('full_name', { ascending: true });
 
-  // Fetch tasks
-  let tasks = [];
-  if (monthRow) {
-    const { data: taskRows } = await supabase
-      .from('pm_tasks')
-      .select('*, machines(*), profiles(*)')
-      .eq('month_id', monthRow.id);
-    if (taskRows) tasks = taskRows;
-  }
-
-  // Fetch shifts for roster grid B
-  const [year, month] = currentMonthStr.split('-').map(Number);
-  const daysInMonth = new Date(year, month, 0).getDate();
-  const startDate = `${currentMonthStr}`;
-  const endDate = `${year}-${String(month).padStart(2, '0')}-${String(daysInMonth).padStart(2, '0')}`;
-
-  const { data: shiftRows } = await supabase
-    .from('shifts')
-    .select('*')
-    .gte('shift_date', startDate)
-    .lte('shift_date', endDate);
-
-  const status = monthRow ? monthRow.status : 'draft';
-
-  // Build Warnings HTML
-  let warningsHtml = '';
-  if (activeWarnings.length > 0) {
-    warningsHtml = `
-      <div id="warnings-panel" class="bg-amber-50 text-amber-900 p-4 rounded-2xl text-xs font-medium space-y-1">
-        <span class="font-bold text-sm block">Schedule Warnings (${activeWarnings.length})</span>
-        <ul class="list-disc list-inside space-y-0.5">
-          ${activeWarnings.map(w => `<li>${w}</li>`).join('')}
-        </ul>
-      </div>
-    `;
-  }
-
-  // Build Header Controls
-  const headerHtml = `
-    <div class="flex flex-wrap items-center justify-between gap-4 bg-white p-4 rounded-2xl shadow-sm no-print">
-      <div class="flex items-center gap-3">
-        <div id="month-selector"></div>
-        ${renderStatusBadge(status)}
-      </div>
-
-      <div class="flex items-center gap-2">
-        <button id="generate-btn" ${status === 'approved' ? 'disabled' : ''} class="px-4 py-2 bg-slate-900 text-white font-semibold text-xs sm:text-sm rounded-xl hover:bg-slate-800 disabled:bg-slate-200 disabled:text-slate-400 transition-all">
-          Generate Schedule
-        </button>
-        <button id="approve-btn" ${status === 'approved' || !monthRow || tasks.length === 0 ? 'disabled' : ''} class="px-4 py-2 bg-emerald-700 text-white font-semibold text-xs sm:text-sm rounded-xl hover:bg-emerald-800 disabled:bg-slate-200 disabled:text-slate-400 transition-all">
-          Approve
-        </button>
-        <button id="print-btn" class="px-4 py-2 bg-slate-100 text-slate-700 font-semibold text-xs sm:text-sm rounded-xl hover:bg-slate-200 transition-all">
-          Print
-        </button>
-      </div>
-    </div>
-  `;
-
-  // Grid Headers (Days 1 to 31)
-  const weekdays = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
-  let dayHeaderCells = '';
-  for (let d = 1; d <= daysInMonth; d++) {
-    const dayOfWeek = new Date(Date.UTC(year, month - 1, d)).getUTCDay();
-    dayHeaderCells += `
-      <th class="p-2 text-center text-slate-500 font-bold border-r border-slate-100 text-xs min-w-[36px]">
-        <div>${d}</div>
-        <div class="text-[9px] font-medium text-slate-400">${weekdays[dayOfWeek]}</div>
-      </th>
-    `;
-  }
-
-  // Grid A Rows: Machines x Days
-  let gridARowsHtml = (machines || []).map(m => {
-    let dayCells = '';
-    for (let d = 1; d <= daysInMonth; d++) {
-      const dayStr = `${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-      const task = tasks.find(t => t.machine_id === m.id && t.scheduled_date === dayStr);
-
-      if (task) {
-        let badgeBg = 'bg-slate-900 text-white';
-        if (task.status === 'in_progress') badgeBg = 'bg-amber-500 text-white';
-        if (task.status === 'completed') badgeBg = 'bg-emerald-600 text-white';
-
-        dayCells += `
-          <td class="p-1 border-r border-slate-100 text-center">
-            <button data-task-id="${task.id}" class="pm-task-cell w-full py-1.5 px-1 rounded font-bold text-[10px] ${badgeBg} hover:scale-105 transition-all truncate">
-              ${task.sequence === 2 ? '2P' : 'PM'}
-            </button>
-          </td>
-        `;
-      } else {
-        dayCells += `<td class="p-1 border-r border-slate-100 text-center"></td>`;
-      }
+    // 4. Fetch scheduled tasks for this month
+    let tasks = [];
+    if (monthRow) {
+      const { data: taskRows } = await supabase
+        .from('pm_tasks')
+        .select('*, machines(*)')
+        .eq('month_id', monthRow.id);
+      if (taskRows) tasks = taskRows;
     }
 
-    const techName = m.profiles?.full_name || 'Unassigned';
+    // 5. Fetch shifts for the month
+    const [year, monthNum] = currentMonthStr.split('-').map(Number);
+    const startDate = currentMonthStr;
+    const daysInMonth = new Date(year, monthNum, 0).getDate();
+    const endDate = `${year}-${String(monthNum).padStart(2, '0')}-${String(daysInMonth).padStart(2, '0')}`;
 
-    return `
-      <tr class="border-b border-slate-100 hover:bg-slate-50/50">
-        <td class="sticky-col-1 p-3 font-bold text-xs text-slate-900 border-r border-slate-100 min-w-[100px]">${m.code}</td>
-        <td class="sticky-col-2 p-3 text-xs text-slate-600 border-r border-slate-100 min-w-[140px]">
-          <div class="font-medium text-slate-900">${techName}</div>
-          <div class="text-[10px] text-slate-400">${m.line || ''} &bull; ${m.pm_per_month} PM/mo</div>
-        </td>
-        ${dayCells}
-      </tr>
-    `;
-  }).join('');
+    const { data: shiftRows } = await supabase
+      .from('shifts')
+      .select('*')
+      .gte('shift_date', startDate)
+      .lte('shift_date', endDate);
 
-  // Grid B Rows: Technicians x Shift Days
-  let gridBRowsHtml = (technicians || []).map(t => {
-    let dayCells = '';
-    const techShifts = (shiftRows || []).filter(s => s.technician_id === t.id);
-
+    // Build calendar header for Matrix (Scrollable)
+    let calendarHeadersHtml = '';
+    let rosterHeadersHtml = '';
+    const dateHeaders = [];
     for (let d = 1; d <= daysInMonth; d++) {
-      const dayStr = `${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-      const stored = techShifts.find(s => s.shift_date === dayStr);
+      const dateStr = `${year}-${String(monthNum).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+      dateHeaders.push(dateStr);
+      calendarHeadersHtml += `<th class="px-1 py-2 text-[11px] font-semibold text-slate-600 text-center min-w-[36px] w-[36px]" data-date="${dateStr}">${d}</th>`;
+      rosterHeadersHtml += `<th class="p-0.5 text-[9px] font-semibold text-slate-600 text-center" data-date="${dateStr}">${d}</th>`;
+    }
 
-      let shiftType = 'rest';
-      if (stored) shiftType = stored.shift_type;
-      else shiftType = getCycleShiftForDate(t, dayStr);
-
-      let textClr = 'text-slate-400';
-      if (shiftType === 'night') textClr = 'font-bold text-indigo-700 bg-indigo-50';
-      if (shiftType === 'day') textClr = 'font-bold text-amber-700 bg-amber-50';
-
-      dayCells += `
-        <td class="p-1 border-r border-slate-100 text-center text-xs ${textClr}">
-          ${shiftType[0].toUpperCase()}
-        </td>
+    // Render Warnings Box if any
+    let warningsHtml = '';
+    if (activeWarnings.length > 0) {
+      warningsHtml = `
+        <div class="bg-amber-50 border border-amber-200 text-amber-900 p-4 rounded-xl text-xs space-y-1 mb-4">
+          <span class="font-bold block uppercase tracking-wider text-[10px]">Schedule Generation Warnings (${activeWarnings.length})</span>
+          <ul class="list-disc list-inside space-y-0.5">
+            ${activeWarnings.map(w => `<li>Machine ${w.machine_code || w.machine_id}: ${w.message}</li>`).join('')}
+          </ul>
+        </div>
       `;
     }
 
-    return `
-      <tr class="border-b border-slate-100">
-        <td class="sticky-col-1 p-3 font-bold text-xs text-slate-900 border-r border-slate-100" colspan="2">${t.full_name}</td>
-        ${dayCells}
-      </tr>
-    `;
-  }).join('');
+    // Render PM Schedule Matrix Rows
+    let matrixRowsHtml = (machines || []).map(m => {
+      const assignedTech = technicians?.find(t => t.id === m.technician_id);
+      const machineTasks = tasks.filter(t => t.machine_id === m.id);
 
-  app.innerHTML = `
-    ${headerHtml}
-    ${warningsHtml}
-
-    <!-- Grid A: PM Schedule -->
-    <div class="bg-white rounded-2xl shadow-sm overflow-hidden space-y-2">
-      <div class="p-4 border-b border-slate-100 font-bold text-sm text-slate-900">Grid A — PM Schedule Matrix</div>
-      <div class="grid-container">
-        <table class="w-full text-left border-collapse">
-          <thead>
-            <tr class="bg-slate-50 border-b border-slate-100">
-              <th class="sticky-corner p-3 text-xs font-bold text-slate-700 border-r border-slate-100 min-w-[100px]">Machine</th>
-              <th class="sticky-header p-3 text-xs font-bold text-slate-700 border-r border-slate-100 min-w-[140px]">Technician</th>
-              ${dayHeaderCells}
-            </tr>
-          </thead>
-          <tbody>
-            ${gridARowsHtml}
-          </tbody>
-        </table>
-      </div>
-    </div>
-
-    <!-- Grid B: Technician Shift Roster -->
-    <div class="bg-white rounded-2xl shadow-sm overflow-hidden space-y-2 no-print">
-      <div class="p-4 border-b border-slate-100 font-bold text-sm text-slate-900">Grid B — Monthly Shift Roster (D=Day, N=Night, R=Rest)</div>
-      <div class="grid-container">
-        <table class="w-full text-left border-collapse">
-          <thead>
-            <tr class="bg-slate-50 border-b border-slate-100">
-              <th class="sticky-corner p-3 text-xs font-bold text-slate-700 border-r border-slate-100" colspan="2">Technician</th>
-              ${dayHeaderCells}
-            </tr>
-          </thead>
-          <tbody>
-            ${gridBRowsHtml}
-          </tbody>
-        </table>
-      </div>
-    </div>
-
-    <!-- Slide-over Drawer Backdrop -->
-    <div id="drawer-backdrop" class="fixed inset-0 bg-slate-900/40 z-50 hidden transition-opacity">
-      <div id="drawer-panel" class="absolute right-0 top-0 bottom-0 w-full max-w-md bg-white p-6 shadow-2xl overflow-y-auto space-y-6"></div>
-    </div>
-  `;
-
-  // Attach Month Selector
-  renderMonthSelector(document.getElementById('month-selector'), currentMonthStr, (newMonth) => {
-    currentMonthStr = newMonth;
-    activeWarnings = [];
-    renderPage(profile);
-  });
-
-  // Generate Button Handler
-  document.getElementById('generate-btn').addEventListener('click', async () => {
-    if (status === 'approved') return;
-    if (!confirm('Generate monthly PM schedule? Existing un-started tasks for this month will be replaced.')) return;
-
-    try {
-      showToast("Generating schedule...", "info");
-
-      // Ensure month record exists
-      if (!monthRow) {
-        const { data: newMonthRow, error: monthErr } = await supabase
-          .from('schedule_months')
-          .insert({ month: currentMonthStr, status: 'draft' })
-          .select()
-          .single();
-        if (monthErr) throw monthErr;
-        monthRow = newMonthRow;
-      }
-
-      // Fetch active machines
-      const { data: activeMachines } = await supabase
-        .from('machines')
-        .select('*')
-        .eq('is_active', true);
-
-      // Fetch all technician profiles
-      const { data: techProfiles } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('role', 'technician')
-        .eq('is_active', true);
-
-      // Build nightsByTech
-      const nightsByTech = {};
-      for (const t of (techProfiles || [])) {
-        // Check stored shifts
-        const { data: tShifts } = await supabase
-          .from('shifts')
-          .select('shift_date')
-          .eq('technician_id', t.id)
-          .eq('shift_type', 'night')
-          .gte('shift_date', startDate)
-          .lte('shift_date', endDate);
-
-        if (tShifts && tShifts.length > 0) {
-          nightsByTech[t.id] = tShifts.map(s => s.shift_date);
-        } else {
-          nightsByTech[t.id] = nightsFromCycle(t, currentMonthStr);
+      let cellsHtml = dateHeaders.map(dateStr => {
+        const matchingTask = machineTasks.find(t => t.scheduled_date === dateStr || (t.latest_allowed_date === dateStr && t.postponed));
+        if (matchingTask) {
+          const is2P = matchingTask.sequence === 2;
+          const label = is2P ? '2P' : 'PM';
+          const bg = matchingTask.status === 'completed' ? 'bg-emerald-600 text-white' : matchingTask.status === 'in_progress' ? 'bg-amber-500 text-white' : 'bg-slate-900 text-white';
+          return `
+            <td class="px-0.5 py-1 text-center align-middle grid-cell min-w-[36px] w-[36px]" data-row-id="m-${m.id}" data-date="${dateStr}">
+              <button data-task-id="${matchingTask.id}" class="task-pill w-full py-1 text-[10px] font-bold rounded ${bg} shadow-sm hover:opacity-90 cursor-pointer transition-all">
+                ${label}
+              </button>
+            </td>
+          `;
         }
-      }
+        return `<td class="px-0.5 py-1 text-center align-middle grid-cell min-w-[36px] w-[36px]" data-row-id="m-${m.id}" data-date="${dateStr}"></td>`;
+      }).join('');
 
-      // Derive previous month string (e.g. 2026-10-01 -> 2026-09-01)
-      const [yearNum, monthNum] = currentMonthStr.split('-').map(Number);
-      let prevYr = yearNum;
-      let prevMo = monthNum - 1;
-      if (prevMo < 1) { prevMo = 12; prevYr -= 1; }
-      const prevMonthStr = `${prevYr}-${String(prevMo).padStart(2, '0')}-01`;
+      return `
+        <tr class="grid-row" data-row-id="m-${m.id}">
+          <td class="px-3 py-2 text-xs font-bold text-slate-900 whitespace-nowrap sticky left-0 bg-white z-10 min-w-[80px] w-[80px] border-r border-slate-200">${m.code}</td>
+          <td class="px-3 py-2 text-xs font-medium text-slate-500 whitespace-nowrap sticky left-[80px] bg-white z-10 min-w-[60px] w-[60px] border-r border-slate-200">${m.line || 'N/A'}</td>
+          <td class="px-3 py-2 text-xs font-medium text-slate-700 whitespace-nowrap sticky left-[140px] bg-white z-10 min-w-[140px] w-[140px] border-r border-slate-200">${assignedTech ? assignedTech.full_name : '<span class="text-rose-500 italic">Unassigned</span>'}</td>
+          ${cellsHtml}
+        </tr>
+      `;
+    }).join('');
 
-      // Fetch previous month PM tasks for cross-month gap checking
-      const previousPmDates = {};
-      const { data: prevMonthRow } = await supabase
-        .from('schedule_months')
-        .select('id')
-        .eq('month', prevMonthStr)
-        .maybeSingle();
+    // Render Technician Roster / Shift Rows below the matrix (Fits screen 100% NO SCROLL)
+    let rosterRowsHtml = (technicians || []).map(t => {
+      const techShifts = (shiftRows || []).filter(s => s.technician_id === t.id);
 
-      if (prevMonthRow) {
-        const { data: prevTasks } = await supabase
-          .from('pm_tasks')
-          .select('machine_id, scheduled_date')
-          .eq('month_id', prevMonthRow.id);
+      let shiftCellsHtml = dateHeaders.map(dateStr => {
+        const storedShift = techShifts.find(s => s.shift_date === dateStr);
+        let shiftType = storedShift ? storedShift.shift_type : getCycleShiftForDate(t, dateStr);
 
-        if (prevTasks) {
-          for (const pt of prevTasks) {
-            if (!previousPmDates[pt.machine_id] || pt.scheduled_date > previousPmDates[pt.machine_id]) {
-              previousPmDates[pt.machine_id] = pt.scheduled_date;
+        let badgeHtml = '';
+        if (shiftType === 'day') {
+          badgeHtml = `<span class="inline-block w-4 h-4 leading-4 text-[9px] font-bold rounded bg-sky-100 text-sky-800 text-center">D</span>`;
+        } else if (shiftType === 'night') {
+          badgeHtml = `<span class="inline-block w-4 h-4 leading-4 text-[9px] font-bold rounded bg-indigo-900 text-white text-center">N</span>`;
+        } else {
+          badgeHtml = `<span class="inline-block w-4 h-4 leading-4 text-[9px] font-bold rounded bg-slate-100 text-slate-400 text-center">R</span>`;
+        }
+
+        return `<td class="p-0 text-center align-middle grid-cell" data-row-id="t-${t.id}" data-date="${dateStr}">${badgeHtml}</td>`;
+      }).join('');
+
+      return `
+        <tr class="grid-row" data-row-id="t-${t.id}">
+          <td class="px-2 py-1.5 text-xs font-bold text-slate-900 whitespace-nowrap w-[140px] truncate border-r border-slate-200" title="${t.full_name}">${t.full_name}</td>
+          ${shiftCellsHtml}
+        </tr>
+      `;
+    }).join('');
+
+    app.innerHTML = `
+      <div class="space-y-6 max-w-full">
+        <!-- Action Bar -->
+        <div class="bg-white p-4 rounded-2xl shadow-sm flex flex-wrap items-center justify-between gap-4">
+          <div class="flex items-center gap-4">
+            <div id="month-selector-container"></div>
+            ${renderStatusBadge(status)}
+          </div>
+          <div class="flex items-center gap-2">
+            <button id="generate-btn" ${status === 'approved' ? 'disabled' : ''} class="px-4 py-2.5 bg-slate-900 text-white font-semibold text-xs sm:text-sm rounded-xl hover:bg-slate-800 transition-all disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed shadow-sm cursor-pointer">
+              Generate PM Schedule
+            </button>
+            <button id="approve-btn" ${status === 'approved' || !monthRow ? 'disabled' : ''} class="px-4 py-2.5 bg-emerald-700 text-white font-semibold text-xs sm:text-sm rounded-xl hover:bg-emerald-800 transition-all disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed shadow-sm cursor-pointer">
+              Approve & Publish
+            </button>
+          </div>
+        </div>
+
+        ${warningsHtml}
+
+        <!-- 1. PM Schedule Matrix Table (Scrollable Detailed Matrix) -->
+        <div class="bg-white rounded-2xl p-4 shadow-sm space-y-3">
+          <div class="flex items-center justify-between">
+            <h2 class="text-base font-bold text-slate-900 tracking-tight">Fleet PM Schedule Matrix (Days 1 - ${daysInMonth})</h2>
+            <span class="text-xs text-slate-400 font-medium">PM = Regular PM &bull; 2P = Second PM</span>
+          </div>
+
+          <div class="grid-container border border-slate-200 rounded-xl overflow-x-auto">
+            <table class="min-w-[1300px] border-separate">
+              <thead>
+                <tr class="bg-slate-50">
+                  <th class="px-3 py-3 text-xs font-bold text-slate-700 text-left sticky left-0 bg-slate-50 z-20 min-w-[80px] w-[80px] border-r border-slate-200">Machine</th>
+                  <th class="px-3 py-3 text-xs font-bold text-slate-700 text-left sticky left-[80px] bg-slate-50 z-20 min-w-[60px] w-[60px] border-r border-slate-200">Line</th>
+                  <th class="px-3 py-3 text-xs font-bold text-slate-700 text-left sticky left-[140px] bg-slate-50 z-20 min-w-[140px] w-[140px] border-r border-slate-200">Technician</th>
+                  ${calendarHeadersHtml}
+                </tr>
+              </thead>
+              <tbody>
+                ${matrixRowsHtml}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- 2. Technician Roster & Shift Cycles Table (No-Scroll Full Month Summary) -->
+        <div class="bg-white rounded-2xl p-4 shadow-sm space-y-3">
+          <div class="flex items-center justify-between flex-wrap gap-2">
+            <h2 class="text-base font-bold text-slate-900 tracking-tight">Technician Monthly Roster & Shift Cycles (Days 1 - ${daysInMonth})</h2>
+            <div class="flex items-center gap-3 text-xs font-semibold">
+              <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-sky-200"></span> Day (D)</span>
+              <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-indigo-900"></span> Night (N)</span>
+              <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-slate-200"></span> Rest (R)</span>
+            </div>
+          </div>
+
+          <div class="grid-container border border-slate-200 rounded-xl overflow-hidden">
+            <table class="w-full table-fixed border-separate">
+              <thead>
+                <tr class="bg-slate-50">
+                  <th class="px-2 py-2 text-xs font-bold text-slate-700 text-left w-[140px] border-r border-slate-200">Technician</th>
+                  ${rosterHeadersHtml}
+                </tr>
+              </thead>
+              <tbody>
+                ${rosterRowsHtml}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Task Details Drawer Panel -->
+      <div id="drawer-backdrop" class="fixed inset-0 bg-slate-900/40 backdrop-blur-xs z-50 hidden transition-opacity">
+        <div id="drawer-panel" class="fixed right-0 top-0 bottom-0 max-w-md w-full bg-white shadow-2xl p-6 overflow-y-auto space-y-6"></div>
+      </div>
+    `;
+
+    // Render Month Selector
+    renderMonthSelector(document.getElementById('month-selector-container'), currentMonthStr, async (newMonth) => {
+      currentMonthStr = newMonth;
+      await renderPage(profile);
+    });
+
+    // Attach Task Pill Click Handler
+    app.querySelectorAll('.task-pill').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        const taskId = btn.dataset.taskId;
+        const taskObj = tasks.find(t => t.id === taskId);
+        if (taskObj) {
+          await openDrawer(taskObj, profile, technicians, shiftRows);
+        }
+      });
+    });
+
+    // Attach Row & Column Blue Hover Highlight Handlers
+    app.querySelectorAll('.grid-cell').forEach(cell => {
+      cell.addEventListener('mouseenter', () => {
+        const rowId = cell.dataset.rowId;
+        const dateStr = cell.dataset.date;
+        if (rowId) {
+          app.querySelectorAll(`.grid-row[data-row-id="${rowId}"] td`).forEach(td => td.classList.add('hover-row'));
+        }
+        if (dateStr) {
+          app.querySelectorAll(`.grid-cell[data-date="${dateStr}"]`).forEach(c => c.classList.add('hover-col'));
+          app.querySelectorAll(`th[data-date="${dateStr}"]`).forEach(th => th.classList.add('hover-col'));
+        }
+        cell.classList.add('hover-cell');
+      });
+
+      cell.addEventListener('mouseleave', () => {
+        const rowId = cell.dataset.rowId;
+        const dateStr = cell.dataset.date;
+        if (rowId) {
+          app.querySelectorAll(`.grid-row[data-row-id="${rowId}"] td`).forEach(td => td.classList.remove('hover-row'));
+        }
+        if (dateStr) {
+          app.querySelectorAll(`.grid-cell[data-date="${dateStr}"]`).forEach(c => c.classList.remove('hover-col'));
+          app.querySelectorAll(`th[data-date="${dateStr}"]`).forEach(th => th.classList.remove('hover-col'));
+        }
+        cell.classList.remove('hover-cell');
+      });
+    });
+
+    // Generate Button Handler
+    document.getElementById('generate-btn').addEventListener('click', async () => {
+      if (status === 'approved') return;
+      if (!confirm('Generate monthly PM schedule? Existing un-started tasks for this month will be replaced.')) return;
+
+      try {
+        showToast("Generating schedule...", "info");
+
+        if (!monthRow) {
+          const { data: newMonthRow, error: monthErr } = await supabase
+            .from('schedule_months')
+            .insert({ month: currentMonthStr, status: 'draft' })
+            .select()
+            .single();
+          if (monthErr) throw monthErr;
+          monthRow = newMonthRow;
+        }
+
+        const { data: activeMachines } = await supabase
+          .from('machines')
+          .select('*')
+          .eq('is_active', true);
+
+        const { data: techProfiles } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('role', 'technician')
+          .eq('is_active', true);
+
+        const nightsByTech = {};
+        for (const t of (techProfiles || [])) {
+          const { data: tShifts } = await supabase
+            .from('shifts')
+            .select('shift_date')
+            .eq('technician_id', t.id)
+            .eq('shift_type', 'night')
+            .gte('shift_date', startDate)
+            .lte('shift_date', endDate);
+
+          if (tShifts && tShifts.length > 0) {
+            nightsByTech[t.id] = tShifts.map(s => s.shift_date);
+          } else {
+            nightsByTech[t.id] = nightsFromCycle(t, currentMonthStr);
+          }
+        }
+
+        const [yearNum, monthNum] = currentMonthStr.split('-').map(Number);
+        let prevYr = yearNum;
+        let prevMo = monthNum - 1;
+        if (prevMo < 1) { prevMo = 12; prevYr -= 1; }
+        const prevMonthStr = `${prevYr}-${String(prevMo).padStart(2, '0')}-01`;
+
+        const previousPmDates = {};
+        const { data: prevMonthRow } = await supabase
+          .from('schedule_months')
+          .select('id')
+          .eq('month', prevMonthStr)
+          .maybeSingle();
+
+        if (prevMonthRow) {
+          const { data: prevTasks } = await supabase
+            .from('pm_tasks')
+            .select('machine_id, scheduled_date')
+            .eq('month_id', prevMonthRow.id);
+
+          if (prevTasks) {
+            for (const pt of prevTasks) {
+              if (!previousPmDates[pt.machine_id] || pt.scheduled_date > previousPmDates[pt.machine_id]) {
+                previousPmDates[pt.machine_id] = pt.scheduled_date;
+              }
             }
           }
         }
+
+        const todayStr = new Date().toISOString().split('T')[0];
+        let minDate = null;
+        if (todayStr.substring(0, 7) === currentMonthStr.substring(0, 7) && todayStr > currentMonthStr) {
+          minDate = todayStr;
+        }
+
+        const { tasks: generatedTasks, warnings } = generateSchedule({
+          monthStart: currentMonthStr,
+          machines: activeMachines,
+          nightsByTech,
+          previousPmDates,
+          minDate,
+          settings: { second_pm_gap_days: '14', second_pm_gap_tolerance_days: '2' }
+        });
+
+        activeWarnings = warnings;
+
+        await supabase.from('pm_tasks').delete().eq('month_id', monthRow.id).eq('status', 'scheduled');
+
+        const insertRows = generatedTasks.map(gt => ({
+          month_id: monthRow.id,
+          machine_id: gt.machine_id,
+          technician_id: gt.technician_id,
+          sequence: gt.sequence,
+          scheduled_date: gt.scheduled_date,
+          latest_allowed_date: gt.latest_allowed_date,
+          status: 'scheduled'
+        }));
+
+        if (insertRows.length > 0) {
+          const { error: insertErr } = await supabase.from('pm_tasks').insert(insertRows);
+          if (insertErr) throw insertErr;
+        }
+
+        showToast("Schedule generated successfully!", "success");
+        await renderPage(profile);
+      } catch (err) {
+        showToast(`Generation failed: ${err.message}`, "error");
       }
-
-      // Check if generating mid-month (today's date > month start)
-      const todayStr = new Date().toISOString().split('T')[0];
-      let minDate = null;
-      if (todayStr.substring(0, 7) === currentMonthStr.substring(0, 7) && todayStr > currentMonthStr) {
-        minDate = todayStr;
-      }
-
-      // Run Scheduler
-      const { tasks: generatedTasks, warnings } = generateSchedule({
-        monthStart: currentMonthStr,
-        machines: activeMachines,
-        nightsByTech,
-        previousPmDates,
-        minDate,
-        settings: { second_pm_gap_days: '14', second_pm_gap_tolerance_days: '2' }
-      });
-
-      activeWarnings = warnings;
-
-      // Delete existing scheduled tasks for draft month
-      await supabase.from('pm_tasks').delete().eq('month_id', monthRow.id).eq('status', 'scheduled');
-
-      // Insert new tasks
-      const insertRows = generatedTasks.map(gt => ({
-        month_id: monthRow.id,
-        machine_id: gt.machine_id,
-        technician_id: gt.technician_id,
-        sequence: gt.sequence,
-        scheduled_date: gt.scheduled_date,
-        latest_allowed_date: gt.latest_allowed_date,
-        status: 'scheduled'
-      }));
-
-      if (insertRows.length > 0) {
-        const { error: insertErr } = await supabase.from('pm_tasks').insert(insertRows);
-        if (insertErr) throw insertErr;
-      }
-
-      showToast("Schedule generated successfully!", "success");
-      await renderPage(profile);
-    } catch (err) {
-      showToast(`Generation failed: ${err.message}`, "error");
-    }
-  });
-
-  // Approve Button Handler
-  document.getElementById('approve-btn').addEventListener('click', async () => {
-    if (!monthRow || monthRow.status === 'approved') return;
-    if (!confirm('Approve PM schedule? Technicians will be able to see their assigned PM tasks immediately.')) return;
-
-    try {
-      const { error: appErr } = await supabase
-        .from('schedule_months')
-        .update({
-          status: 'approved',
-          approved_by: profile.id,
-          approved_at: new Date().toISOString()
-        })
-        .eq('id', monthRow.id);
-
-      if (appErr) throw appErr;
-      showToast("Schedule approved and published!", "success");
-      await renderPage(profile);
-    } catch (err) {
-      showToast(`Approval failed: ${err.message}`, "error");
-    }
-  });
-
-  // Print Button Handler
-  document.getElementById('print-btn').addEventListener('click', () => {
-    window.print();
-  });
-
-  // Cell Drawer Click Handlers
-  document.querySelectorAll('.pm-task-cell').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const tId = btn.dataset.taskId;
-      const taskObj = tasks.find(t => t.id === tId);
-      if (taskObj) openDrawer(taskObj, profile, technicians, shiftRows);
-    });
-  });
-
-  // Table Row & Column Blue Hover Highlight Event Delegation
-  document.querySelectorAll('.grid-container table').forEach(table => {
-    table.addEventListener('mouseover', (e) => {
-      const td = e.target.closest('td, th');
-      if (!td) return;
-      const colIndex = td.cellIndex;
-      const tr = td.closest('tr');
-
-      table.querySelectorAll('.hover-row, .hover-col, .hover-cell').forEach(el => {
-        el.classList.remove('hover-row', 'hover-col', 'hover-cell');
-      });
-
-      if (tr) tr.classList.add('hover-row');
-      if (colIndex !== undefined && colIndex >= 0) {
-        table.querySelectorAll(`tr > *:nth-child(${colIndex + 1})`).forEach(cell => cell.classList.add('hover-col'));
-      }
-      td.classList.add('hover-cell');
     });
 
-    table.addEventListener('mouseleave', () => {
-      table.querySelectorAll('.hover-row, .hover-col, .hover-cell').forEach(el => {
-        el.classList.remove('hover-row', 'hover-col', 'hover-cell');
-      });
+    // Approve Button Handler
+    document.getElementById('approve-btn').addEventListener('click', async () => {
+      if (!monthRow || monthRow.status === 'approved') return;
+      if (!confirm('Approve PM schedule? Technicians will be able to see their assigned PM tasks immediately.')) return;
+
+      try {
+        const { error: appErr } = await supabase
+          .from('schedule_months')
+          .update({
+            status: 'approved',
+            approved_by: profile.id,
+            approved_at: new Date().toISOString()
+          })
+          .eq('id', monthRow.id);
+
+        if (appErr) throw appErr;
+
+        showToast("Schedule approved and published!", "success");
+        await renderPage(profile);
+      } catch (err) {
+        showToast(`Approval failed: ${err.message}`, "error");
+      }
     });
-  });
+
   } catch (err) {
     console.error(err);
     app.innerHTML = `<div class="p-8 text-center text-rose-600 font-bold">Error loading schedule matrix: ${err.message || err}</div>`;
   }
 }
 
-function openDrawer(task, profile, technicians, shiftRows) {
+async function openDrawer(task, profile, technicians, shiftRows) {
   const backdrop = document.getElementById('drawer-backdrop');
   const panel = document.getElementById('drawer-panel');
 
   const tech = technicians.find(t => t.id === task.technician_id);
 
-  // Calculate available night dates for date dropdown (R2, R3)
+  // Fetch photos for task
+  const { data: photos } = await supabase
+    .from('pm_photos')
+    .select('*')
+    .eq('pm_task_id', task.id);
+
+  const photoUrls = [];
+  if (photos && photos.length > 0) {
+    for (const photo of photos) {
+      const { data: signedData } = await supabase.storage
+        .from('pm-photos')
+        .createSignedUrl(photo.storage_path, 3600);
+      if (signedData?.signedUrl) {
+        photoUrls.push({ id: photo.id, url: signedData.signedUrl });
+      }
+    }
+  }
+
+  // Calculate available night dates for date dropdown
   const techShifts = (shiftRows || []).filter(s => s.technician_id === task.technician_id);
   const generatedNights = nightsFromCycle(tech, currentMonthStr);
   const availableNights = new Set(generatedNights);
@@ -451,10 +455,22 @@ function openDrawer(task, profile, technicians, shiftRows) {
 
   const sortedNights = Array.from(availableNights).sort();
 
+  let photosHtml = photoUrls.map((p, idx) => `
+    <div class="relative group rounded-xl overflow-hidden bg-slate-100 aspect-square shadow-sm cursor-pointer border border-slate-200 hover:border-slate-400 transition-all">
+      <img src="${p.url}" alt="PM Evidence ${idx + 1}" data-photo-url="${p.url}" class="drawer-lightbox-trigger w-full h-full object-cover">
+      <div class="absolute inset-0 bg-slate-900/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
+        <span class="bg-slate-900/90 text-white text-[10px] font-bold px-2 py-1 rounded">Zoom & Download</span>
+      </div>
+    </div>
+  `).join('');
+
   panel.innerHTML = `
     <div class="flex items-center justify-between border-b border-slate-100 pb-4">
-      <h3 class="font-bold text-lg text-slate-900">${task.machines?.code} ${task.sequence === 2 ? '(2P)' : '(PM)'}</h3>
-      <button id="close-drawer" class="text-slate-400 hover:text-slate-900 font-bold text-sm">✕ Close</button>
+      <div>
+        <h3 class="font-bold text-lg text-slate-900">${task.machines?.code} ${task.sequence === 2 ? '(2P)' : '(PM)'}</h3>
+        <p class="text-xs text-slate-500 font-medium">Line ${task.machines?.line || 'N/A'}</p>
+      </div>
+      <button id="close-drawer" class="text-slate-400 hover:text-slate-900 font-bold text-sm cursor-pointer">✕ Close</button>
     </div>
 
     <div class="space-y-4 text-xs font-medium text-slate-700">
@@ -482,9 +498,27 @@ function openDrawer(task, profile, technicians, shiftRows) {
       ${task.notes ? `
         <div class="space-y-1">
           <span class="text-slate-400 block text-[10px] uppercase font-bold">Technician Notes</span>
-          <p class="p-3 bg-slate-50 rounded-xl text-slate-800">${task.notes}</p>
+          <p class="p-3 bg-slate-50 rounded-xl text-slate-800 font-normal leading-relaxed">${task.notes}</p>
         </div>
       ` : ''}
+
+      <!-- Evidence Photos Section -->
+      <div class="space-y-2 pt-1 border-t border-slate-100">
+        <span class="text-slate-400 block text-[10px] uppercase font-bold">Evidence Photos (${photoUrls.length})</span>
+        ${photoUrls.length > 0 ? `
+          <div class="grid grid-cols-3 gap-2">
+            ${photosHtml}
+          </div>
+        ` : `
+          <p class="text-xs text-slate-400 italic">No photos uploaded for this PM.</p>
+        `}
+      </div>
+
+      <div class="pt-2 border-t border-slate-100">
+        <a href="../tech/pm.html?id=${task.id}" class="w-full py-3 bg-slate-900 text-white font-bold rounded-xl text-xs shadow-sm hover:bg-slate-800 transition-all flex items-center justify-center gap-2">
+          Open Full PM Page &rarr;
+        </a>
+      </div>
 
       ${task.status === 'scheduled' ? `
         <div class="border-t border-slate-100 pt-4 space-y-2">
@@ -492,7 +526,7 @@ function openDrawer(task, profile, technicians, shiftRows) {
           <select id="change-date-select" class="w-full p-3 bg-slate-100 rounded-xl text-sm font-medium focus:outline-none">
             ${sortedNights.map(n => `<option value="${n}" ${n === task.scheduled_date ? 'selected' : ''}>${formatDateDDMMYYYY(n)} (${n === task.scheduled_date ? 'Current' : 'Night'})</option>`).join('')}
           </select>
-          <button id="save-date-btn" class="w-full py-3 bg-slate-900 text-white font-bold rounded-xl text-xs shadow-sm hover:bg-slate-800">
+          <button id="save-date-btn" class="w-full py-3 bg-slate-900 text-white font-bold rounded-xl text-xs shadow-sm hover:bg-slate-800 cursor-pointer">
             Update PM Date
           </button>
         </div>
@@ -501,6 +535,14 @@ function openDrawer(task, profile, technicians, shiftRows) {
   `;
 
   backdrop.classList.remove('hidden');
+
+  // Lightbox click trigger inside drawer
+  panel.querySelectorAll('.drawer-lightbox-trigger').forEach(img => {
+    img.addEventListener('click', () => {
+      const url = img.getAttribute('data-photo-url');
+      if (url) openPhotoLightbox(url, `${task.machines?.code || 'PM'} Evidence Photo`);
+    });
+  });
 
   document.getElementById('close-drawer').addEventListener('click', () => {
     backdrop.classList.add('hidden');
@@ -531,7 +573,7 @@ function openDrawer(task, profile, technicians, shiftRows) {
         backdrop.classList.add('hidden');
         await renderPage(profile);
       } catch (err) {
-        showToast(`Failed to update date: ${err.message}`, "error");
+        showToast(`Update failed: ${err.message}`, "error");
       }
     });
   }

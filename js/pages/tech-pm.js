@@ -2,7 +2,7 @@
 import { requireRole } from '../guard.js';
 import { supabase } from '../supabase-client.js';
 import { fetchServerContext, initServerTimeSync, formatDateDDMMYYYY, formatTime24h, formatDurationMinutes } from '../time.js';
-import { renderTopBar, renderStatusBadge, showToast } from '../ui.js';
+import { renderTopBar, renderStatusBadge, showToast, openPhotoLightbox } from '../ui.js';
 
 let taskId = new URLSearchParams(window.location.search).get('id');
 
@@ -107,11 +107,14 @@ async function renderTaskDetails(profile, serverCtx) {
   else if (!isNightTime) startDisabledReason = `Available on ${formatDateDDMMYYYY(task.scheduled_date)} during night shift (20:30 - 08:30).`;
   else if (!canStartNight) startDisabledReason = `Scheduled for night of ${formatDateDDMMYYYY(task.scheduled_date)}.`;
 
-  let photosHtml = photoUrls.map(p => `
-    <div class="relative group rounded-xl overflow-hidden bg-slate-100 aspect-square shadow-sm">
-      <img src="${p.url}" alt="PM Evidence" class="w-full h-full object-cover">
-      ${task.status === 'in_progress' && isOwner ? `
-        <button data-photo-id="${p.id}" data-photo-path="${p.path}" class="delete-photo-btn absolute top-2 right-2 bg-rose-600 text-white text-xs px-2 py-1 rounded-md opacity-90 hover:opacity-100">Delete</button>
+  let photosHtml = photoUrls.map((p, idx) => `
+    <div class="relative group rounded-xl overflow-hidden bg-slate-100 aspect-square shadow-sm cursor-pointer border border-slate-200 hover:border-slate-400 transition-all">
+      <img src="${p.url}" alt="PM Evidence ${idx + 1}" data-photo-url="${p.url}" class="lightbox-trigger w-full h-full object-cover">
+      <div class="absolute inset-0 bg-slate-900/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
+        <span class="bg-slate-900/80 text-white text-[10px] font-bold px-2 py-1 rounded">Click to Zoom</span>
+      </div>
+      ${(task.status === 'in_progress' || task.status === 'completed') && isOwner ? `
+        <button data-photo-id="${p.id}" data-photo-path="${p.path}" class="delete-photo-btn absolute top-2 right-2 bg-rose-600 text-white text-xs px-2 py-1 rounded-md opacity-90 hover:opacity-100 shadow-sm">Delete</button>
       ` : ''}
     </div>
   `).join('');
@@ -200,16 +203,17 @@ async function renderTaskDetails(profile, serverCtx) {
         <div class="space-y-3 pt-2">
           <div class="flex items-center justify-between">
             <span class="text-xs font-semibold uppercase text-slate-500">Evidence Photos (${photoUrls.length}/5)</span>
-            ${task.status === 'in_progress' && isOwner && photoUrls.length < 5 ? `
-              <label class="cursor-pointer bg-slate-900 text-white px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-slate-800 transition-all">
-                Upload Photo
+            ${(task.status === 'in_progress' || task.status === 'completed') && isOwner && photoUrls.length < 5 ? `
+              <label class="cursor-pointer bg-slate-900 text-white px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-slate-800 transition-all flex items-center gap-1.5">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                ${task.status === 'completed' ? 'Add Forgot Photo' : 'Upload Photo'}
                 <input id="photo-file-input" type="file" accept="image/*" capture="environment" multiple class="hidden">
               </label>
             ` : ''}
           </div>
 
           <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
-            ${photosHtml}
+            ${photosHtml || '<p class="text-xs font-medium text-slate-400 py-2 col-span-full">No evidence photos uploaded yet.</p>'}
           </div>
         </div>
 
@@ -224,7 +228,15 @@ async function renderTaskDetails(profile, serverCtx) {
     </div>
   `;
 
-  // Attach Event Handlers
+  // Attach Lightbox triggers
+  app.querySelectorAll('.lightbox-trigger').forEach(img => {
+    img.addEventListener('click', () => {
+      const url = img.getAttribute('data-photo-url');
+      if (url) openPhotoLightbox(url, `${task.machines?.code} Evidence Photo`);
+    });
+  });
+
+  // Attach Start PM Handler
   const startBtn = document.getElementById('start-pm-btn');
   if (startBtn && canStart) {
     startBtn.addEventListener('click', async () => {
@@ -277,7 +289,7 @@ async function renderTaskDetails(profile, serverCtx) {
     });
   }
 
-  // Photo Upload Handler
+  // Photo Upload Handler (Supports uploading during in_progress or completed)
   const photoInput = document.getElementById('photo-file-input');
   if (photoInput) {
     photoInput.addEventListener('change', async (e) => {
@@ -326,8 +338,9 @@ async function renderTaskDetails(profile, serverCtx) {
   // Delete Photo Handlers
   document.querySelectorAll('.delete-photo-btn').forEach(btn => {
     btn.addEventListener('click', async (e) => {
-      const photoId = e.target.dataset.photoId;
-      const photoPath = e.target.dataset.photoPath;
+      e.stopPropagation(); // prevent opening lightbox
+      const photoId = btn.dataset.photoId;
+      const photoPath = btn.dataset.photoPath;
 
       if (!confirm('Are you sure you want to delete this photo?')) return;
 

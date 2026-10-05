@@ -51,9 +51,9 @@ button, input, select, textarea, a.btn-touch {
 }
 
 .grid-container table {
-  background-color: #e2e8f0; /* Crisp slate-200 gridlines via 1px cell separation */
-  border-spacing: 1px;
-  border-collapse: separate;
+  background-color: #cbd5e1 !important; /* Crisp slate-300 gridlines via 1px cell separation */
+  border-spacing: 1px !important;
+  border-collapse: separate !important;
 }
 
 .grid-container table td,
@@ -68,17 +68,20 @@ button, input, select, textarea, a.btn-touch {
 
 /* Row & Column Blue Hover Highlight */
 .grid-container table tr.hover-row td,
-.grid-container table tr.hover-row th {
+.grid-container table tr.hover-row th,
+td.hover-row {
   background-color: #e0f2fe !important; /* sky-100 */
 }
 
 .grid-container table td.hover-col,
-.grid-container table th.hover-col {
+.grid-container table th.hover-col,
+td.hover-col {
   background-color: #f0f9ff !important; /* sky-50 */
 }
 
 .grid-container table td.hover-cell,
-.grid-container table th.hover-cell {
+.grid-container table th.hover-cell,
+td.hover-cell {
   background-color: #bae6fd !important; /* sky-200 for target cell */
 }
 
