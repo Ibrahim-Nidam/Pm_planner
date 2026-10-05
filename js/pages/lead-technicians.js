@@ -157,9 +157,10 @@ async function renderPage(profile) {
             <div>
               <label class="block text-[10px] font-bold uppercase text-slate-500 mb-1">Anchor Shift Type *</label>
               <select id="tech-anchor-type" class="w-full p-3 bg-slate-100 rounded-xl text-sm font-semibold focus:outline-none">
-                <option value="night">Night Shift (N)</option>
-                <option value="day">Day Shift (D)</option>
-                <option value="rest">Rest Shift (R)</option>
+                <option value="night">Night Shift (N) — Day 2 of 4</option>
+                <option value="day">Day Shift (D) — Day 1 of 4</option>
+                <option value="rest1">Rest 1 Shift (R1) — Day 3 of 4</option>
+                <option value="rest2">Rest 2 Shift (R2) — Day 4 of 4</option>
               </select>
             </div>
           </div>
@@ -299,7 +300,9 @@ async function renderPage(profile) {
 
     let anchor_index = 1;
     if (cycle_anchor_shift_type === 'day') anchor_index = 0;
-    if (cycle_anchor_shift_type === 'rest') anchor_index = 2;
+    else if (cycle_anchor_shift_type === 'night') anchor_index = 1;
+    else if (cycle_anchor_shift_type === 'rest1' || cycle_anchor_shift_type === 'rest') anchor_index = 2;
+    else if (cycle_anchor_shift_type === 'rest2') anchor_index = 3;
 
     try {
       if (id) {
@@ -345,7 +348,8 @@ async function renderPage(profile) {
           const { data, error: rpcErr } = await supabase.rpc('admin_create_technician', {
             p_full_name: full_name,
             p_cycle_anchor_date: cycle_anchor_date,
-            p_cycle_anchor_shift_type: cycle_anchor_shift_type
+            p_cycle_anchor_shift_type: cycle_anchor_shift_type,
+            p_cycle_anchor_index: anchor_index
           });
 
           if (rpcErr) throw rpcErr;

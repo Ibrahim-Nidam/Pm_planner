@@ -183,21 +183,28 @@ async function renderPage(profile) {
         const nightSet = new Set(nights);
 
         // Derive 4-day cycle for all days in month
-        const anchorDate = new Date(tech.cycle_anchor_date || currentMonthStr);
-        const anchorShift = tech.cycle_anchor_shift_type || 'night';
-        let anchorIndex = 1; // default night
-        if (anchorShift === 'day') anchorIndex = 0;
-        if (anchorShift === 'rest') anchorIndex = 2;
+        const anchorStr = tech.cycle_anchor_date || currentMonthStr;
+        const [aYear, aMonth, aDay] = anchorStr.split('-').map(Number);
+        const anchorUtc = Date.UTC(aYear, aMonth - 1, aDay);
+
+        let anchorIndex = tech.cycle_anchor_index ?? 1;
+        if (tech.cycle_anchor_index == null) {
+          const anchorShift = tech.cycle_anchor_shift_type || 'night';
+          if (anchorShift === 'day') anchorIndex = 0;
+          else if (anchorShift === 'night') anchorIndex = 1;
+          else if (anchorShift === 'rest1' || anchorShift === 'rest') anchorIndex = 2;
+          else if (anchorShift === 'rest2') anchorIndex = 3;
+        }
 
         for (let d = 1; d <= daysInMonth; d++) {
           const dayStr = `${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-          const currentUtc = new Date(Date.UTC(year, month - 1, d));
-          const diffDays = Math.round((currentUtc - Date.UTC(anchorDate.getUTCFullYear(), anchorDate.getUTCMonth(), anchorDate.getUTCDate())) / 86400000);
+          const currentUtc = Date.UTC(year, month - 1, d);
+          const diffDays = Math.round((currentUtc - anchorUtc) / 86400000);
           
-          let cyclePos = (anchorIndex + diffDays) % 4;
+          let cyclePos = (anchorIndex + (diffDays % 4)) % 4;
           if (cyclePos < 0) cyclePos += 4;
 
-          let shiftType = 'rest';
+          let shiftType = 'rest'; // Index 2 = Rest 1, Index 3 = Rest 2
           if (cyclePos === 0) shiftType = 'day';
           else if (cyclePos === 1) shiftType = 'night';
 

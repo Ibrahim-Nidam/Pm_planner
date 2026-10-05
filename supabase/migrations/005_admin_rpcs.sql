@@ -1,11 +1,12 @@
--- 005_admin_rpcs.sql — Database RPC functions for technician management without Edge Functions requirement.
+-- 005_admin_rpcs.sql — Database RPC functions for technician management supporting full 4-day shift cycle (Day, Night, Rest 1, Rest 2).
 
 -- 1. admin_create_technician RPC
 create or replace function public.admin_create_technician(
   p_full_name text,
   p_username text default null,
   p_cycle_anchor_date date default '2026-10-01',
-  p_cycle_anchor_shift_type text default 'night'
+  p_cycle_anchor_shift_type text default 'night',
+  p_cycle_anchor_index int default null
 )
 returns jsonb
 language plpgsql
@@ -43,8 +44,16 @@ begin
 
   v_email := v_username || '@pmplanner.local';
 
-  if p_cycle_anchor_shift_type = 'day' then v_anchor_index := 0; end if;
-  if p_cycle_anchor_shift_type = 'rest' then v_anchor_index := 2; end if;
+  -- Resolve anchor index (0=Day, 1=Night, 2=Rest 1, 3=Rest 2)
+  if p_cycle_anchor_index is not null then
+    v_anchor_index := p_cycle_anchor_index;
+  else
+    if p_cycle_anchor_shift_type = 'day' then v_anchor_index := 0;
+    elsif p_cycle_anchor_shift_type = 'night' then v_anchor_index := 1;
+    elsif p_cycle_anchor_shift_type = 'rest1' or p_cycle_anchor_shift_type = 'rest' then v_anchor_index := 2;
+    elsif p_cycle_anchor_shift_type = 'rest2' then v_anchor_index := 3;
+    end if;
+  end if;
 
   -- Insert Auth User
   insert into auth.users (
