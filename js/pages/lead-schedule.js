@@ -3,7 +3,7 @@ import { requireRole } from '../guard.js';
 import { supabase } from '../supabase-client.js';
 import { formatDateDDMMYYYY, formatTime24h, formatDurationMinutes } from '../time.js';
 import { renderTopBar, renderStatusBadge, renderMonthSelector, showToast } from '../ui.js';
-import { generateSchedule, nightsFromCycle, toleranceDate } from '../scheduler.js';
+import { generateSchedule, nightsFromCycle, getCycleShiftForDate, toleranceDate } from '../scheduler.js';
 
 let currentMonthStr = '2026-10-01'; // default to acceptance test month
 let activeWarnings = [];
@@ -157,15 +157,13 @@ async function renderPage(profile) {
     let dayCells = '';
     const techShifts = (shiftRows || []).filter(s => s.technician_id === t.id);
 
-    const generatedNights = new Set(nightsFromCycle(t, currentMonthStr));
-
     for (let d = 1; d <= daysInMonth; d++) {
       const dayStr = `${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
       const stored = techShifts.find(s => s.shift_date === dayStr);
 
       let shiftType = 'rest';
       if (stored) shiftType = stored.shift_type;
-      else if (generatedNights.has(dayStr)) shiftType = 'night';
+      else shiftType = getCycleShiftForDate(t, dayStr);
 
       let textClr = 'text-slate-400';
       if (shiftType === 'night') textClr = 'font-bold text-indigo-700 bg-indigo-50';

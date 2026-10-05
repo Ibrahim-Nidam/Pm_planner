@@ -3,7 +3,7 @@ import { requireRole } from '../guard.js';
 import { supabase } from '../supabase-client.js';
 import { fetchServerContext, initServerTimeSync, formatDateDDMMYYYY } from '../time.js';
 import { renderTopBar, renderMustChangePasswordBanner, renderStatusBadge, renderMonthSelector } from '../ui.js';
-import { nightsFromCycle } from '../scheduler.js';
+import { nightsFromCycle, getCycleShiftForDate } from '../scheduler.js';
 
 let currentMonthStr = new Date().toISOString().slice(0, 7) + '-01';
 
@@ -116,8 +116,8 @@ async function renderDashboard(profile, serverCtx) {
     const stored = (storedShifts || []).find(s => s.shift_date === dayStr);
     if (stored) {
       shiftType = stored.shift_type;
-    } else if (generatedNights.has(dayStr)) {
-      shiftType = 'night';
+    } else {
+      shiftType = getCycleShiftForDate(profile, dayStr);
     }
 
     let shiftBg = 'bg-slate-100 text-slate-600';

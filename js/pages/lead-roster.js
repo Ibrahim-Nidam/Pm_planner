@@ -3,7 +3,7 @@ import { requireRole } from '../guard.js';
 import { supabase } from '../supabase-client.js';
 import { formatDateDDMMYYYY } from '../time.js';
 import { renderTopBar, renderMonthSelector, showToast } from '../ui.js';
-import { nightsFromCycle } from '../scheduler.js';
+import { nightsFromCycle, getCycleShiftForDate } from '../scheduler.js';
 
 let currentMonthStr = '2026-10-01';
 let activeWarnings = [];
@@ -104,7 +104,6 @@ async function renderPage(profile) {
   let techRowsHtml = (technicians || []).map(tech => {
     let dayCells = '';
     const techShifts = (shiftRows || []).filter(s => s.technician_id === tech.id);
-    const cycleNights = new Set(nightsFromCycle(tech, currentMonthStr));
 
     for (let d = 1; d <= daysInMonth; d++) {
       const dayStr = `${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
@@ -113,8 +112,8 @@ async function renderPage(profile) {
       let shiftType = 'rest';
       if (stored) {
         shiftType = stored.shift_type;
-      } else if (cycleNights.has(dayStr)) {
-        shiftType = 'night';
+      } else {
+        shiftType = getCycleShiftForDate(tech, dayStr);
       }
 
       let badgeBg = 'bg-slate-100 text-slate-400 hover:bg-slate-200';

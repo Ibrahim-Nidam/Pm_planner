@@ -3,26 +3,39 @@
 /**
  * Returns ISO date strings for all night shifts of a technician in the target month based on cycle anchor.
  */
+export function getCycleShiftForDate(profile, dateStr) {
+  if (!profile || !profile.cycle_anchor_date || profile.cycle_anchor_index == null) {
+    return 'rest';
+  }
+
+  const [aYear, aMonth, aDay] = profile.cycle_anchor_date.split('-').map(Number);
+  const anchorUtc = Date.UTC(aYear, aMonth - 1, aDay);
+
+  const [year, month, day] = dateStr.split('-').map(Number);
+  const currentUtc = Date.UTC(year, month - 1, day);
+
+  const diffDays = Math.round((currentUtc - anchorUtc) / (1000 * 60 * 60 * 24));
+  let cyclePos = (profile.cycle_anchor_index + (diffDays % 4)) % 4;
+  if (cyclePos < 0) cyclePos += 4;
+
+  if (cyclePos === 0) return 'day';
+  if (cyclePos === 1) return 'night';
+  return 'rest';
+}
+
 export function nightsFromCycle(profile, monthStartStr) {
   if (!profile || !profile.cycle_anchor_date || profile.cycle_anchor_index == null) {
     return [];
   }
 
-  const anchor = new Date(profile.cycle_anchor_date);
   const [year, month] = monthStartStr.split('-').map(Number);
   const daysInMonth = new Date(year, month, 0).getDate();
   const nights = [];
 
   for (let day = 1; day <= daysInMonth; day++) {
-    const d = new Date(Date.UTC(year, month - 1, day));
-    const diffDays = Math.floor((d.getTime() - anchor.getTime()) / (1000 * 60 * 60 * 24));
-    // JavaScript modulo wrapper for negative numbers
-    let cyclePos = (profile.cycle_anchor_index + (diffDays % 4)) % 4;
-    if (cyclePos < 0) cyclePos += 4;
-
-    if (cyclePos === 1) { // 1 = Night
-      const yyyymmdd = d.toISOString().split('T')[0];
-      nights.push(yyyymmdd);
+    const dayStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    if (getCycleShiftForDate(profile, dayStr) === 'night') {
+      nights.push(dayStr);
     }
   }
 
