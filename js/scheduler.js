@@ -1,7 +1,8 @@
 // Pure scheduling engine (SPECS §8)
 
 /**
- * Returns ISO date strings for all night shifts of a technician in the target month based on cycle anchor.
+ * Calculates the shift type ('day', 'night', 'rest') for a technician profile on a specific date string.
+ * Cycle: Index 0 = Day, Index 1 = Night, Index 2 = Rest, Index 3 = Rest.
  */
 export function getCycleShiftForDate(profile, dateStr) {
   if (!profile || !profile.cycle_anchor_date || profile.cycle_anchor_index == null) {
@@ -23,6 +24,9 @@ export function getCycleShiftForDate(profile, dateStr) {
   return 'rest';
 }
 
+/**
+ * Returns ISO date strings for all night shifts of a technician in the target month based on cycle anchor.
+ */
 export function nightsFromCycle(profile, monthStartStr) {
   if (!profile || !profile.cycle_anchor_date || profile.cycle_anchor_index == null) {
     return [];
@@ -73,9 +77,9 @@ export function toleranceDate(scheduledDateStr, techNights) {
 
 /**
  * Pure scheduling function.
- * SPECS §8 Algorithm.
+ * SPECS §8 Algorithm with mid-month generation & cross-month gap support.
  */
-export function generateSchedule({ monthStart, machines, nightsByTech, settings = {} }) {
+export function generateSchedule({ monthStart, machines, nightsByTech, previousPmDates = {}, minDate = null, settings = {} }) {
   const gap = parseInt(settings.second_pm_gap_days || '14', 10);
   const tol = parseInt(settings.second_pm_gap_tolerance_days || '2', 10);
   const minGap = gap - tol;
@@ -105,10 +109,15 @@ export function generateSchedule({ monthStart, machines, nightsByTech, settings 
 
   for (const techId of techIds) {
     const techMachines = techMachineMap.get(techId);
-    const techNights = [...(nightsByTech[techId] || [])].sort();
+    let techNights = [...(nightsByTech[techId] || [])].sort();
+
+    // If minDate is specified (generating mid-month), filter out past nights
+    if (minDate) {
+      techNights = techNights.filter(n => n >= minDate);
+    }
 
     if (techNights.length === 0) {
-      warnings.push(`Technician ${techId} has no night shifts in ${monthStart}.`);
+      warnings.push(`Technician ${techId} has no available night shifts in ${monthStart}.`);
       continue;
     }
 
@@ -123,21 +132,33 @@ export function generateSchedule({ monthStart, machines, nightsByTech, settings 
     for (const m of machines2PM) {
       let bestPair = null;
       let bestCost = Infinity;
+      const prevPmDate = previousPmDates[m.id];
 
       for (let i = 0; i < freeNights.length; i++) {
         for (let j = i + 1; j < freeNights.length; j++) {
           const dateA = freeNights[i];
           const dateB = freeNights[j];
 
+          // Check cross-month gap constraint for dateA
+          let validCrossMonth = true;
+          if (prevPmDate) {
+            const prevDiff = Math.round((new Date(dateA).getTime() - new Date(prevPmDate).getTime()) / (1000 * 60 * 60 * 24));
+            if (prevDiff < minGap) {
+              validCrossMonth = false;
+            }
+          }
+
           const diffMs = new Date(dateB).getTime() - new Date(dateA).getTime();
           const diffDays = Math.round(diffMs / (1000 * 60 * 60 * 24));
 
           if (diffDays >= minGap && diffDays <= maxGap) {
             const dayNum = parseInt(dateA.split('-')[2], 10);
-            const cost = Math.abs(diffDays - gap) * 10 + dayNum;
+            let cost = Math.abs(diffDays - gap) * 10 + dayNum;
+            if (!validCrossMonth) cost += 1000;
+
             if (cost < bestCost) {
               bestCost = cost;
-              bestPair = { a: dateA, b: dateB, inRange: true };
+              bestPair = { a: dateA, b: dateB, inRange: true, validCrossMonth };
             }
           }
         }
@@ -151,19 +172,32 @@ export function generateSchedule({ monthStart, machines, nightsByTech, settings 
             const dateB = freeNights[j];
             const diffMs = new Date(dateB).getTime() - new Date(dateA).getTime();
             const diffDays = Math.round(diffMs / (1000 * 60 * 60 * 24));
-            const cost = Math.abs(diffDays - gap) * 10;
+            let cost = Math.abs(diffDays - gap) * 10;
+
+            if (prevPmDate) {
+              const prevDiff = Math.round((new Date(dateA).getTime() - new Date(prevPmDate).getTime()) / (1000 * 60 * 60 * 24));
+              if (prevDiff < minGap) cost += 1000;
+            }
+
             if (cost < bestCost) {
               bestCost = cost;
-              bestPair = { a: dateA, b: dateB, inRange: false };
+              bestPair = { a: dateA, b: dateB, inRange: false, validCrossMonth: true };
             }
           }
         }
-        if (bestPair) {
+        if (bestPair && !bestPair.inRange) {
           warnings.push(`2P gap for machine ${m.code} is outside ${minGap}-${maxGap} days range.`);
         }
       }
 
       if (bestPair) {
+        if (prevPmDate) {
+          const prevDiff = Math.round((new Date(bestPair.a).getTime() - new Date(prevPmDate).getTime()) / (1000 * 60 * 60 * 24));
+          if (prevDiff < minGap) {
+            warnings.push(`Cross-month gap for machine ${m.code} (${prevDiff} days) is less than minimum ${minGap} days from previous PM on ${prevPmDate}.`);
+          }
+        }
+
         // Remove chosen nights from freeNights
         freeNights = freeNights.filter(n => n !== bestPair.a && n !== bestPair.b);
         placedDates.push(bestPair.a, bestPair.b);
@@ -202,6 +236,7 @@ export function generateSchedule({ monthStart, machines, nightsByTech, settings 
       let bestNight = null;
       let maxMinDist = -1;
       let minMidDist = Infinity;
+      const prevPmDate = previousPmDates[m.id];
 
       for (const n of freeNights) {
         // Calculate min distance to already placed dates for this tech
@@ -213,7 +248,12 @@ export function generateSchedule({ monthStart, machines, nightsByTech, settings 
         if (placedDates.length === 0) minDist = 0;
 
         const dayNum = parseInt(n.split('-')[2], 10);
-        const midDist = Math.abs(dayNum - 15);
+        let midDist = Math.abs(dayNum - 15);
+
+        if (prevPmDate) {
+          const prevDiff = Math.round((new Date(n).getTime() - new Date(prevPmDate).getTime()) / (1000 * 60 * 60 * 24));
+          if (prevDiff < minGap) midDist += 1000;
+        }
 
         if (minDist > maxMinDist || (minDist === maxMinDist && midDist < minMidDist)) {
           maxMinDist = minDist;
@@ -223,6 +263,13 @@ export function generateSchedule({ monthStart, machines, nightsByTech, settings 
       }
 
       if (bestNight) {
+        if (prevPmDate) {
+          const prevDiff = Math.round((new Date(bestNight).getTime() - new Date(prevPmDate).getTime()) / (1000 * 60 * 60 * 24));
+          if (prevDiff < minGap) {
+            warnings.push(`Cross-month gap for machine ${m.code} (${prevDiff} days) is less than minimum ${minGap} days from previous PM on ${prevPmDate}.`);
+          }
+        }
+
         freeNights = freeNights.filter(n => n !== bestNight);
         placedDates.push(bestNight);
         usedNightsGlobal.add(bestNight);

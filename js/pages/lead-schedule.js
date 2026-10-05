@@ -282,11 +282,41 @@ async function renderPage(profile) {
           .gte('shift_date', startDate)
           .lte('shift_date', endDate);
 
-        if (tShifts && tShifts.length > 0) {
-          nightsByTech[t.id] = tShifts.map(s => s.shift_date);
-        } else {
-          nightsByTech[t.id] = nightsFromCycle(t, currentMonthStr);
+      // Derive previous month string (e.g. 2026-10-01 -> 2026-09-01)
+      const [yearNum, monthNum] = currentMonthStr.split('-').map(Number);
+      let prevYr = yearNum;
+      let prevMo = monthNum - 1;
+      if (prevMo < 1) { prevMo = 12; prevYr -= 1; }
+      const prevMonthStr = `${prevYr}-${String(prevMo).padStart(2, '0')}-01`;
+
+      // Fetch previous month PM tasks for cross-month gap checking
+      const previousPmDates = {};
+      const { data: prevMonthRow } = await supabase
+        .from('schedule_months')
+        .select('id')
+        .eq('month', prevMonthStr)
+        .maybeSingle();
+
+      if (prevMonthRow) {
+        const { data: prevTasks } = await supabase
+          .from('pm_tasks')
+          .select('machine_id, scheduled_date')
+          .eq('month_id', prevMonthRow.id);
+
+        if (prevTasks) {
+          for (const pt of prevTasks) {
+            if (!previousPmDates[pt.machine_id] || pt.scheduled_date > previousPmDates[pt.machine_id]) {
+              previousPmDates[pt.machine_id] = pt.scheduled_date;
+            }
+          }
         }
+      }
+
+      // Check if generating mid-month (today's date > month start)
+      const todayStr = new Date().toISOString().split('T')[0];
+      let minDate = null;
+      if (todayStr.substring(0, 7) === currentMonthStr.substring(0, 7) && todayStr > currentMonthStr) {
+        minDate = todayStr;
       }
 
       // Run Scheduler
@@ -294,6 +324,8 @@ async function renderPage(profile) {
         monthStart: currentMonthStr,
         machines: activeMachines,
         nightsByTech,
+        previousPmDates,
+        minDate,
         settings: { second_pm_gap_days: '14', second_pm_gap_tolerance_days: '2' }
       });
 
@@ -359,6 +391,32 @@ async function renderPage(profile) {
       const tId = btn.dataset.taskId;
       const taskObj = tasks.find(t => t.id === tId);
       if (taskObj) openDrawer(taskObj, profile, technicians, shiftRows);
+    });
+  });
+
+  // Table Row & Column Blue Hover Highlight Event Delegation
+  document.querySelectorAll('.grid-container table').forEach(table => {
+    table.addEventListener('mouseover', (e) => {
+      const td = e.target.closest('td, th');
+      if (!td) return;
+      const colIndex = td.cellIndex;
+      const tr = td.closest('tr');
+
+      table.querySelectorAll('.hover-row, .hover-col, .hover-cell').forEach(el => {
+        el.classList.remove('hover-row', 'hover-col', 'hover-cell');
+      });
+
+      if (tr) tr.classList.add('hover-row');
+      if (colIndex !== undefined && colIndex >= 0) {
+        table.querySelectorAll(`tr > *:nth-child(${colIndex + 1})`).forEach(cell => cell.classList.add('hover-col'));
+      }
+      td.classList.add('hover-cell');
+    });
+
+    table.addEventListener('mouseleave', () => {
+      table.querySelectorAll('.hover-row, .hover-col, .hover-cell').forEach(el => {
+        el.classList.remove('hover-row', 'hover-col', 'hover-cell');
+      });
     });
   });
 }

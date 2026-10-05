@@ -25,7 +25,7 @@ export function renderTopBar(containerEl, profile, title = "PM Planner") {
         <div class="flex items-center gap-3">
           <span class="text-xs sm:text-sm font-medium text-slate-600">${profile.full_name}</span>
           <a href="${rootPath}profile.html" class="text-xs sm:text-sm font-medium text-slate-600 hover:text-slate-900 px-2 py-1 bg-slate-100 rounded-md">Profile</a>
-          <button id="logout-btn" class="text-xs sm:text-sm font-medium text-rose-600 hover:text-rose-700 px-2 py-1 bg-rose-50 rounded-md">Sign Out</button>
+          <button id="logout-btn" class="text-xs sm:text-sm font-medium text-rose-600 hover:text-rose-700 px-2 py-1 bg-rose-50 rounded-md cursor-pointer">Sign Out</button>
         </div>
       </div>
     </header>
@@ -95,21 +95,36 @@ export function showToast(message, type = 'info') {
 export function renderMonthSelector(containerEl, currentMonthStr, onChange) {
   if (!containerEl) return;
   // currentMonthStr format: "YYYY-MM-01"
-  const d = new Date(currentMonthStr);
-  const year = d.getFullYear();
-  const month = d.getMonth();
+  const parts = currentMonthStr.split('-');
+  const year = parseInt(parts[0], 10);
+  const month = parseInt(parts[1], 10); // 1 to 12
 
-  const prevDate = new Date(year, month - 1, 1).toISOString().split('T')[0];
-  const nextDate = new Date(year, month + 1, 1).toISOString().split('T')[0];
+  // Previous month
+  let prevYear = year;
+  let prevMonth = month - 1;
+  if (prevMonth < 1) {
+    prevMonth = 12;
+    prevYear -= 1;
+  }
+  const prevDate = `${prevYear}-${String(prevMonth).padStart(2, '0')}-01`;
+
+  // Next month
+  let nextYear = year;
+  let nextMonth = month + 1;
+  if (nextMonth > 12) {
+    nextMonth = 1;
+    nextYear += 1;
+  }
+  const nextDate = `${nextYear}-${String(nextMonth).padStart(2, '0')}-01`;
 
   const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
-  const displayLabel = `${monthNames[month]} ${year}`;
+  const displayLabel = `${monthNames[month - 1]} ${year}`;
 
   containerEl.innerHTML = `
     <div class="inline-flex items-center bg-white rounded-lg shadow-sm px-2 py-1 gap-3">
-      <button id="prev-month-btn" class="p-1.5 text-slate-600 hover:bg-slate-100 rounded-md font-bold text-sm" title="Previous Month">&lt;</button>
+      <button id="prev-month-btn" class="p-1.5 text-slate-600 hover:bg-slate-100 rounded-md font-bold text-sm cursor-pointer" title="Previous Month">&lt;</button>
       <span class="text-xs sm:text-sm font-semibold text-slate-800 min-w-[120px] text-center">${displayLabel}</span>
-      <button id="next-month-btn" class="p-1.5 text-slate-600 hover:bg-slate-100 rounded-md font-bold text-sm" title="Next Month">&gt;</button>
+      <button id="next-month-btn" class="p-1.5 text-slate-600 hover:bg-slate-100 rounded-md font-bold text-sm cursor-pointer" title="Next Month">&gt;</button>
     </div>
   `;
 

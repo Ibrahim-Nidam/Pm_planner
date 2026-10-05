@@ -9,6 +9,7 @@
 /* Global Reset & Border-0 Defaults */
 * {
   border: 0 !important;
+  outline: 0 !important;
   box-sizing: border-box;
 }
 
@@ -43,31 +44,60 @@ button, input, select, textarea, a.btn-touch {
   background: #94a3b8;
 }
 
-/* Schedule Grid Sticky Layout */
+/* Schedule Grid Sticky Layout & Crisp Matrix Lines */
 .grid-container {
   overflow-x: auto;
   max-width: 100%;
+}
+
+.grid-container table {
+  background-color: #e2e8f0; /* Crisp slate-200 gridlines via 1px cell separation */
+  border-spacing: 1px;
+  border-collapse: separate;
+}
+
+.grid-container table td,
+.grid-container table th {
+  background-color: #ffffff;
+}
+
+.grid-container table tr.bg-slate-50 td,
+.grid-container table tr.bg-slate-50 th {
+  background-color: #f8fafc;
+}
+
+/* Row & Column Blue Hover Highlight */
+.grid-container table tr.hover-row td,
+.grid-container table tr.hover-row th {
+  background-color: #e0f2fe !important; /* sky-100 */
+}
+
+.grid-container table td.hover-col,
+.grid-container table th.hover-col {
+  background-color: #f0f9ff !important; /* sky-50 */
+}
+
+.grid-container table td.hover-cell,
+.grid-container table th.hover-cell {
+  background-color: #bae6fd !important; /* sky-200 for target cell */
 }
 
 .sticky-col-1 {
   position: sticky;
   left: 0;
   z-index: 20;
-  background-color: #ffffff;
 }
 
 .sticky-col-2 {
   position: sticky;
   left: 100px;
   z-index: 20;
-  background-color: #ffffff;
 }
 
 .sticky-header {
   position: sticky;
   top: 0;
   z-index: 30;
-  background-color: #f1f5f9;
 }
 
 .sticky-corner {
@@ -75,7 +105,6 @@ button, input, select, textarea, a.btn-touch {
   left: 0;
   top: 0;
   z-index: 40;
-  background-color: #e2e8f0;
 }
 
 /* Print Stylesheet (SPECS §10.5) */

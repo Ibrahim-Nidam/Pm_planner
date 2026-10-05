@@ -269,6 +269,32 @@ async function renderPage(profile) {
       }
     });
   });
+
+  // Table Row & Column Blue Hover Highlight Event Delegation
+  document.querySelectorAll('.grid-container table').forEach(table => {
+    table.addEventListener('mouseover', (e) => {
+      const td = e.target.closest('td, th');
+      if (!td) return;
+      const colIndex = td.cellIndex;
+      const tr = td.closest('tr');
+
+      table.querySelectorAll('.hover-row, .hover-col, .hover-cell').forEach(el => {
+        el.classList.remove('hover-row', 'hover-col', 'hover-cell');
+      });
+
+      if (tr) tr.classList.add('hover-row');
+      if (colIndex !== undefined && colIndex >= 0) {
+        table.querySelectorAll(`tr > *:nth-child(${colIndex + 1})`).forEach(cell => cell.classList.add('hover-col'));
+      }
+      td.classList.add('hover-cell');
+    });
+
+    table.addEventListener('mouseleave', () => {
+      table.querySelectorAll('.hover-row, .hover-col, .hover-cell').forEach(el => {
+        el.classList.remove('hover-row', 'hover-col', 'hover-cell');
+      });
+    });
+  });
 }
 
 init();
