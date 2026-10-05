@@ -274,7 +274,7 @@ async function renderPage(profile) {
 
       // Build nightsByTech
       const nightsByTech = {};
-      for (const t of techProfiles) {
+      for (const t of (techProfiles || [])) {
         // Check stored shifts
         const { data: tShifts } = await supabase
           .from('shifts')
@@ -283,6 +283,13 @@ async function renderPage(profile) {
           .eq('shift_type', 'night')
           .gte('shift_date', startDate)
           .lte('shift_date', endDate);
+
+        if (tShifts && tShifts.length > 0) {
+          nightsByTech[t.id] = tShifts.map(s => s.shift_date);
+        } else {
+          nightsByTech[t.id] = nightsFromCycle(t, currentMonthStr);
+        }
+      }
 
       // Derive previous month string (e.g. 2026-10-01 -> 2026-09-01)
       const [yearNum, monthNum] = currentMonthStr.split('-').map(Number);
