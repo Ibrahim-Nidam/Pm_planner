@@ -246,10 +246,10 @@ async function renderPage(profile) {
         try {
           res = await callEdgeFunction('admin-reset-password', { user_id: tId });
         } catch (efErr) {
-          // Fallback if Edge function not deployed locally: update profile flag directly
-          const { error: profErr } = await supabase.from('profiles').update({ must_change_password: true }).eq('id', tId);
-          if (profErr) throw profErr;
-          res = { default_password: 'PMPlanner123!' };
+          // Fallback to database RPC
+          const { data, error } = await supabase.rpc('admin_reset_password', { p_user_id: tId });
+          if (error) throw error;
+          res = data;
         }
 
         createdCredentials = {
@@ -274,8 +274,8 @@ async function renderPage(profile) {
         try {
           await callEdgeFunction('admin-set-active', { user_id: tId, is_active: !currentActive });
         } catch (efErr) {
-          // Direct fallback if edge function not deployed
-          const { error } = await supabase.from('profiles').update({ is_active: !currentActive }).eq('id', tId);
+          // Fallback to database RPC
+          const { error } = await supabase.rpc('admin_set_active', { p_user_id: tId, p_is_active: !currentActive });
           if (error) throw error;
         }
 
@@ -341,30 +341,19 @@ async function renderPage(profile) {
             cycle_anchor_index: anchor_index
           });
         } catch (efErr) {
-          // Direct fallback for local dev if Edge Function is not live
-          const username = full_name.toLowerCase().replace(/[^a-z0-9]/g, '');
-          const { data: newProf, error: insErr } = await supabase
-            .from('profiles')
-            .insert({
-              full_name,
-              username,
-              role: 'technician',
-              cycle_anchor_date,
-              cycle_anchor_shift_type,
-              cycle_anchor_index: anchor_index,
-              must_change_password: true,
-              is_active: true
-            })
-            .select()
-            .single();
+          // Fallback to database RPC (no Edge Function required)
+          const { data, error: rpcErr } = await supabase.rpc('admin_create_technician', {
+            p_full_name: full_name,
+            p_cycle_anchor_date: cycle_anchor_date,
+            p_cycle_anchor_shift_type: cycle_anchor_shift_type
+          });
 
-          if (insErr) throw insErr;
+          if (rpcErr) throw rpcErr;
+          res = data;
 
-          if (selectedMachineIds.length > 0) {
-            await supabase.from('machines').update({ technician_id: newProf.id }).in('id', selectedMachineIds);
+          if (selectedMachineIds.length > 0 && res.user_id) {
+            await supabase.from('machines').update({ technician_id: res.user_id }).in('id', selectedMachineIds);
           }
-
-          res = { username, default_password: 'PMPlanner123!' };
         }
 
         createdCredentials = {

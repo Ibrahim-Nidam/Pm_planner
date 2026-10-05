@@ -14,7 +14,7 @@ export function getAdminClient() {
 }
 
 export function toEmail(username: string): string {
-  return `${username.toLowerCase().trim()}@pm-planner.local`;
+  return `${username.toLowerCase().trim()}@pmplanner.local`;
 }
 
 export async function assertCallerIsActiveLead(req: Request) {
