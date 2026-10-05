@@ -74,7 +74,7 @@ async function renderPage(profile) {
     for (let d = 1; d <= daysInMonth; d++) {
       const dateStr = `${year}-${String(monthNum).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
       dateHeaders.push(dateStr);
-      calendarHeadersHtml += `<th class="px-1 py-2 text-[11px] font-semibold text-slate-600 text-center min-w-[36px] w-[36px]" data-date="${dateStr}">${d}</th>`;
+      calendarHeadersHtml += `<th class="px-1 py-1.5 text-[11px] font-semibold text-slate-600 text-center min-w-[36px] w-[36px]" data-date="${dateStr}">${d}</th>`;
       rosterHeadersHtml += `<th class="p-0.5 text-[9px] font-semibold text-slate-600 text-center" data-date="${dateStr}">${d}</th>`;
     }
 
@@ -103,27 +103,31 @@ async function renderPage(profile) {
           const label = is2P ? '2P' : 'PM';
           const bg = matchingTask.status === 'completed' ? 'bg-emerald-600 text-white' : matchingTask.status === 'in_progress' ? 'bg-amber-500 text-white' : 'bg-slate-900 text-white';
           return `
-            <td class="px-0.5 py-1 text-center align-middle grid-cell min-w-[36px] w-[36px]" data-row-id="m-${m.id}" data-date="${dateStr}">
-              <button data-task-id="${matchingTask.id}" class="task-pill w-full py-1 text-[10px] font-bold rounded ${bg} shadow-sm hover:opacity-90 cursor-pointer transition-all">
+            <td class="p-1 text-center align-middle grid-cell min-w-[36px] w-[36px]" data-row-id="m-${m.id}" data-machine-id="${m.id}" data-date="${dateStr}">
+              <button data-task-id="${matchingTask.id}" class="task-pill w-full h-[20px] text-[9px] font-bold rounded ${bg} shadow-xs hover:opacity-90 cursor-pointer transition-all">
                 ${label}
               </button>
             </td>
           `;
         }
-        return `<td class="px-0.5 py-1 text-center align-middle grid-cell min-w-[36px] w-[36px]" data-row-id="m-${m.id}" data-date="${dateStr}"></td>`;
+        return `
+          <td class="p-1 text-center align-middle grid-cell min-w-[36px] w-[36px] hover:bg-sky-100/60 cursor-pointer group" data-row-id="m-${m.id}" data-machine-id="${m.id}" data-date="${dateStr}" title="Click to manually add PM">
+            <span class="text-[9px] font-bold text-slate-300 opacity-0 group-hover:opacity-100">+</span>
+          </td>
+        `;
       }).join('');
 
       return `
         <tr class="grid-row" data-row-id="m-${m.id}">
-          <td class="px-3 py-2 text-xs font-bold text-slate-900 whitespace-nowrap sticky left-0 bg-white z-10 min-w-[80px] w-[80px] border-r border-slate-200">${m.code}</td>
-          <td class="px-3 py-2 text-xs font-medium text-slate-500 whitespace-nowrap sticky left-[80px] bg-white z-10 min-w-[60px] w-[60px] border-r border-slate-200">${m.line || 'N/A'}</td>
-          <td class="px-3 py-2 text-xs font-medium text-slate-700 whitespace-nowrap sticky left-[140px] bg-white z-10 min-w-[140px] w-[140px] border-r border-slate-200">${assignedTech ? assignedTech.full_name : '<span class="text-rose-500 italic">Unassigned</span>'}</td>
+          <td class="px-3 py-1.5 text-xs font-bold text-slate-900 whitespace-nowrap sticky left-0 bg-white z-10 min-w-[80px] w-[80px] border-r border-slate-200">${m.code}</td>
+          <td class="px-3 py-1.5 text-xs font-medium text-slate-500 whitespace-nowrap sticky left-[80px] bg-white z-10 min-w-[60px] w-[60px] border-r border-slate-200">${m.line || 'N/A'}</td>
+          <td class="px-3 py-1.5 text-xs font-medium text-slate-700 whitespace-nowrap sticky left-[140px] bg-white z-10 min-w-[140px] w-[140px] border-r border-slate-200">${assignedTech ? assignedTech.full_name : '<span class="text-rose-500 italic">Unassigned</span>'}</td>
           ${cellsHtml}
         </tr>
       `;
     }).join('');
 
-    // Render Technician Roster / Shift Rows below the matrix (Fits screen 100% NO SCROLL)
+    // Render Technician Roster Rows below the matrix (Fits screen 100% NO SCROLL)
     let rosterRowsHtml = (technicians || []).map(t => {
       const techShifts = (shiftRows || []).filter(s => s.technician_id === t.id);
 
@@ -159,9 +163,15 @@ async function renderPage(profile) {
             <div id="month-selector-container"></div>
             ${renderStatusBadge(status)}
           </div>
-          <div class="flex items-center gap-2">
+          <div class="flex items-center gap-2 flex-wrap">
+            <button id="add-pm-btn" class="px-4 py-2.5 bg-slate-800 text-white font-semibold text-xs sm:text-sm rounded-xl hover:bg-slate-700 transition-all shadow-sm cursor-pointer flex items-center gap-1.5">
+              <span>+</span> Add PM Task
+            </button>
             <button id="generate-btn" ${status === 'approved' ? 'disabled' : ''} class="px-4 py-2.5 bg-slate-900 text-white font-semibold text-xs sm:text-sm rounded-xl hover:bg-slate-800 transition-all disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed shadow-sm cursor-pointer">
-              Generate PM Schedule
+              Auto-Generate Matrix
+            </button>
+            <button id="clear-btn" ${!monthRow || tasks.length === 0 ? 'disabled' : ''} class="px-4 py-2.5 bg-rose-50 text-rose-700 font-semibold text-xs sm:text-sm rounded-xl hover:bg-rose-100 transition-all disabled:bg-slate-100 disabled:text-slate-300 disabled:cursor-not-allowed shadow-sm cursor-pointer">
+              Clear Matrix
             </button>
             <button id="approve-btn" ${status === 'approved' || !monthRow ? 'disabled' : ''} class="px-4 py-2.5 bg-emerald-700 text-white font-semibold text-xs sm:text-sm rounded-xl hover:bg-emerald-800 transition-all disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed shadow-sm cursor-pointer">
               Approve & Publish
@@ -175,16 +185,16 @@ async function renderPage(profile) {
         <div class="bg-white rounded-2xl p-4 shadow-sm space-y-3">
           <div class="flex items-center justify-between">
             <h2 class="text-base font-bold text-slate-900 tracking-tight">Fleet PM Schedule Matrix (Days 1 - ${daysInMonth})</h2>
-            <span class="text-xs text-slate-400 font-medium">PM = Regular PM &bull; 2P = Second PM</span>
+            <span class="text-xs text-slate-400 font-medium">Click empty cell to manually add PM &bull; Click task pill to view/edit</span>
           </div>
 
           <div class="grid-container border border-slate-200 rounded-xl overflow-x-auto">
             <table class="min-w-[1300px] border-separate">
               <thead>
                 <tr class="bg-slate-50">
-                  <th class="px-3 py-3 text-xs font-bold text-slate-700 text-left sticky left-0 bg-slate-50 z-20 min-w-[80px] w-[80px] border-r border-slate-200">Machine</th>
-                  <th class="px-3 py-3 text-xs font-bold text-slate-700 text-left sticky left-[80px] bg-slate-50 z-20 min-w-[60px] w-[60px] border-r border-slate-200">Line</th>
-                  <th class="px-3 py-3 text-xs font-bold text-slate-700 text-left sticky left-[140px] bg-slate-50 z-20 min-w-[140px] w-[140px] border-r border-slate-200">Technician</th>
+                  <th class="px-3 py-2 text-xs font-bold text-slate-700 text-left sticky left-0 bg-slate-50 z-20 min-w-[80px] w-[80px] border-r border-slate-200">Machine</th>
+                  <th class="px-3 py-2 text-xs font-bold text-slate-700 text-left sticky left-[80px] bg-slate-50 z-20 min-w-[60px] w-[60px] border-r border-slate-200">Line</th>
+                  <th class="px-3 py-2 text-xs font-bold text-slate-700 text-left sticky left-[140px] bg-slate-50 z-20 min-w-[140px] w-[140px] border-r border-slate-200">Technician</th>
                   ${calendarHeadersHtml}
                 </tr>
               </thead>
@@ -222,6 +232,52 @@ async function renderPage(profile) {
         </div>
       </div>
 
+      <!-- Add Manual PM Modal -->
+      <div id="add-pm-modal" class="fixed inset-0 bg-slate-900/40 backdrop-blur-xs z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-white max-w-md w-full rounded-2xl p-6 shadow-2xl space-y-4">
+          <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+            <h3 class="font-bold text-lg text-slate-900">Add Manual PM Task</h3>
+            <button id="close-add-modal" class="text-slate-400 hover:text-slate-900 font-bold text-sm cursor-pointer">✕</button>
+          </div>
+
+          <form id="add-pm-form" class="space-y-4">
+            <div>
+              <label class="block text-xs font-semibold uppercase text-slate-500 mb-1">Target Machine</label>
+              <select id="manual-machine" required class="w-full p-3 bg-slate-100 text-slate-900 rounded-xl text-sm font-medium focus:outline-none">
+                ${(machines || []).map(m => `<option value="${m.id}">${m.code} (${m.line || 'Line N/A'})</option>`).join('')}
+              </select>
+            </div>
+
+            <div>
+              <label class="block text-xs font-semibold uppercase text-slate-500 mb-1">Assigned Technician</label>
+              <select id="manual-tech" required class="w-full p-3 bg-slate-100 text-slate-900 rounded-xl text-sm font-medium focus:outline-none">
+                ${(technicians || []).map(t => `<option value="${t.id}">${t.full_name} (@${t.username})</option>`).join('')}
+              </select>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block text-xs font-semibold uppercase text-slate-500 mb-1">PM Type</label>
+                <select id="manual-sequence" required class="w-full p-3 bg-slate-100 text-slate-900 rounded-xl text-sm font-medium focus:outline-none">
+                  <option value="1">Regular PM (1st)</option>
+                  <option value="2">Second PM (2P)</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-xs font-semibold uppercase text-slate-500 mb-1">Scheduled Night</label>
+                <select id="manual-date" required class="w-full p-3 bg-slate-100 text-slate-900 rounded-xl text-sm font-medium focus:outline-none">
+                  ${dateHeaders.map(d => `<option value="${d}">${formatDateDDMMYYYY(d)}</option>`).join('')}
+                </select>
+              </div>
+            </div>
+
+            <button type="submit" class="w-full py-3.5 bg-slate-900 text-white font-bold rounded-xl text-sm shadow-sm hover:bg-slate-800 cursor-pointer">
+              Save PM Task
+            </button>
+          </form>
+        </div>
+      </div>
+
       <!-- Task Details Drawer Panel -->
       <div id="drawer-backdrop" class="fixed inset-0 bg-slate-900/40 backdrop-blur-xs z-50 hidden transition-opacity">
         <div id="drawer-panel" class="fixed right-0 top-0 bottom-0 max-w-md w-full bg-white shadow-2xl p-6 overflow-y-auto space-y-6"></div>
@@ -241,13 +297,24 @@ async function renderPage(profile) {
         const taskId = btn.dataset.taskId;
         const taskObj = tasks.find(t => t.id === taskId);
         if (taskObj) {
-          await openDrawer(taskObj, profile, technicians, shiftRows);
+          await openDrawer(taskObj, profile, technicians, shiftRows, monthRow);
         }
       });
     });
 
-    // Attach Row & Column Blue Hover Highlight Handlers
+    // Attach Empty Grid Cell Click Handler to Open Add Modal
     app.querySelectorAll('.grid-cell').forEach(cell => {
+      cell.addEventListener('click', (e) => {
+        if (e.target.classList.contains('task-pill')) return;
+        const machineId = cell.dataset.machineId;
+        const dateStr = cell.dataset.date;
+
+        if (machineId && dateStr) {
+          openAddPmModal(machineId, dateStr, machines, technicians);
+        }
+      });
+
+      // Hover highlights
       cell.addEventListener('mouseenter', () => {
         const rowId = cell.dataset.rowId;
         const dateStr = cell.dataset.date;
@@ -273,6 +340,94 @@ async function renderPage(profile) {
         }
         cell.classList.remove('hover-cell');
       });
+    });
+
+    // Clear Matrix Handler (uses security definer RPC to bypass RLS)
+    const clearBtn = document.getElementById('clear-btn');
+    if (clearBtn) {
+      clearBtn.addEventListener('click', async () => {
+        if (!monthRow) return;
+        if (!confirm(`Are you sure you want to CLEAR all un-started PM tasks for ${currentMonthStr}? The schedule will be reset to draft state so you can re-generate.`)) return;
+
+        try {
+          const { data: resetRow, error: clearErr } = await supabase
+            .rpc('clear_schedule', { p_month_id: monthRow.id });
+
+          if (clearErr) throw clearErr;
+
+          showToast("Schedule matrix cleared & reset to draft!", "success");
+          activeWarnings = [];
+          await renderPage(profile);
+        } catch (err) {
+          showToast(`Clear failed: ${err.message}`, "error");
+        }
+      });
+    }
+
+    // Add PM Button Handler
+    const addPmBtn = document.getElementById('add-pm-btn');
+    if (addPmBtn) {
+      addPmBtn.addEventListener('click', () => {
+        openAddPmModal(null, null, machines, technicians);
+      });
+    }
+
+    // Add PM Form Handler
+    const addPmForm = document.getElementById('add-pm-form');
+    if (addPmForm) {
+      addPmForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const machineId = document.getElementById('manual-machine').value;
+        const techId = document.getElementById('manual-tech').value;
+        const sequence = parseInt(document.getElementById('manual-sequence').value, 10);
+        const schedDate = document.getElementById('manual-date').value;
+
+        try {
+          // Ensure month record exists
+          if (!monthRow) {
+            const { data: newMonthRow, error: monthErr } = await supabase
+              .from('schedule_months')
+              .insert({ month: currentMonthStr, status: 'draft' })
+              .select()
+              .single();
+            if (monthErr) throw monthErr;
+            monthRow = newMonthRow;
+          }
+
+          // Delete existing task for (month_id, machine_id, sequence) if present
+          await supabase
+            .from('pm_tasks')
+            .delete()
+            .eq('month_id', monthRow.id)
+            .eq('machine_id', machineId)
+            .eq('sequence', sequence);
+
+          // Insert manual task
+          const { error: insErr } = await supabase
+            .from('pm_tasks')
+            .insert({
+              month_id: monthRow.id,
+              machine_id: machineId,
+              technician_id: techId,
+              sequence: sequence,
+              scheduled_date: schedDate,
+              latest_allowed_date: schedDate,
+              status: 'scheduled'
+            });
+
+          if (insErr) throw insErr;
+
+          showToast("PM task added successfully!", "success");
+          document.getElementById('add-pm-modal').classList.add('hidden');
+          await renderPage(profile);
+        } catch (err) {
+          showToast(`Failed to add PM: ${err.message}`, "error");
+        }
+      });
+    }
+
+    document.getElementById('close-add-modal')?.addEventListener('click', () => {
+      document.getElementById('add-pm-modal').classList.add('hidden');
     });
 
     // Generate Button Handler
@@ -390,20 +545,14 @@ async function renderPage(profile) {
       }
     });
 
-    // Approve Button Handler
+    // Approve Button Handler (uses security definer RPC to bypass RLS)
     document.getElementById('approve-btn').addEventListener('click', async () => {
       if (!monthRow || monthRow.status === 'approved') return;
       if (!confirm('Approve PM schedule? Technicians will be able to see their assigned PM tasks immediately.')) return;
 
       try {
-        const { error: appErr } = await supabase
-          .from('schedule_months')
-          .update({
-            status: 'approved',
-            approved_by: profile.id,
-            approved_at: new Date().toISOString()
-          })
-          .eq('id', monthRow.id);
+        const { data: approved, error: appErr } = await supabase
+          .rpc('approve_schedule', { p_month_id: monthRow.id });
 
         if (appErr) throw appErr;
 
@@ -420,7 +569,28 @@ async function renderPage(profile) {
   }
 }
 
-async function openDrawer(task, profile, technicians, shiftRows) {
+function openAddPmModal(machineId, dateStr, machines, technicians) {
+  const modal = document.getElementById('add-pm-modal');
+  if (!modal) return;
+
+  const machineSelect = document.getElementById('manual-machine');
+  const techSelect = document.getElementById('manual-tech');
+  const dateSelect = document.getElementById('manual-date');
+
+  if (machineId && machineSelect) machineSelect.value = machineId;
+  if (dateStr && dateSelect) dateSelect.value = dateStr;
+
+  if (machineSelect && techSelect) {
+    const selectedM = (machines || []).find(m => m.id === machineSelect.value);
+    if (selectedM && selectedM.technician_id) {
+      techSelect.value = selectedM.technician_id;
+    }
+  }
+
+  modal.classList.remove('hidden');
+}
+
+async function openDrawer(task, profile, technicians, shiftRows, monthRow) {
   const backdrop = document.getElementById('drawer-backdrop');
   const panel = document.getElementById('drawer-panel');
 
@@ -514,10 +684,15 @@ async function openDrawer(task, profile, technicians, shiftRows) {
         `}
       </div>
 
-      <div class="pt-2 border-t border-slate-100">
-        <a href="../tech/pm.html?id=${task.id}" class="w-full py-3 bg-slate-900 text-white font-bold rounded-xl text-xs shadow-sm hover:bg-slate-800 transition-all flex items-center justify-center gap-2">
+      <div class="pt-2 border-t border-slate-100 flex items-center gap-2">
+        <a href="../tech/pm.html?id=${task.id}" class="flex-1 py-3 bg-slate-900 text-white font-bold rounded-xl text-xs shadow-sm hover:bg-slate-800 transition-all flex items-center justify-center gap-2">
           Open Full PM Page &rarr;
         </a>
+        ${task.status === 'scheduled' ? `
+          <button id="delete-task-btn" class="px-4 py-3 bg-rose-50 text-rose-700 font-bold rounded-xl text-xs hover:bg-rose-100 transition-all cursor-pointer">
+            Delete
+          </button>
+        ` : ''}
       </div>
 
       ${task.status === 'scheduled' ? `
@@ -547,6 +722,28 @@ async function openDrawer(task, profile, technicians, shiftRows) {
   document.getElementById('close-drawer').addEventListener('click', () => {
     backdrop.classList.add('hidden');
   });
+
+  // Delete individual task handler
+  const delTaskBtn = document.getElementById('delete-task-btn');
+  if (delTaskBtn) {
+    delTaskBtn.addEventListener('click', async () => {
+      if (!confirm(`Delete PM task for ${task.machines?.code}?`)) return;
+
+      try {
+        const { error: delErr } = await supabase
+          .from('pm_tasks')
+          .delete()
+          .eq('id', task.id);
+
+        if (delErr) throw delErr;
+        showToast("PM task deleted", "success");
+        backdrop.classList.add('hidden');
+        await renderPage(profile);
+      } catch (err) {
+        showToast(`Delete failed: ${err.message}`, "error");
+      }
+    });
+  }
 
   const saveDateBtn = document.getElementById('save-date-btn');
   if (saveDateBtn) {

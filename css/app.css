@@ -20,9 +20,20 @@ body {
   min-height: 100vh;
 }
 
-/* Minimum 44px touch targets for mobile accessibility */
-button, input, select, textarea, a.btn-touch {
+/* Minimum 44px touch targets for mobile accessibility (Exempt task pills) */
+button:not(.task-pill), input, select, textarea, a.btn-touch {
   min-height: 44px;
+}
+
+/* Compact Task Pill Micro-Badges */
+.task-pill {
+  min-height: 20px !important;
+  height: 20px !important;
+  padding: 0 2px !important;
+  font-size: 9px !important;
+  line-height: 20px !important;
+  border-radius: 4px !important;
+  display: block !important;
 }
 
 /* Custom Scrollbars */
