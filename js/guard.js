@@ -2,11 +2,13 @@
 import { getCurrentSession, getProfile, logout } from './auth.js';
 
 export async function requireRole(allowedRole = 'any') {
+  const isSubFolder = window.location.pathname.includes('/lead/') || window.location.pathname.includes('/tech/');
+  const rootPath = isSubFolder ? '../' : './';
+
   const session = await getCurrentSession();
-  const rootPath = window.location.pathname.includes('/lead/') || window.location.pathname.includes('/tech/') ? '../' : './';
 
   if (!session) {
-    window.location.href = rootPath + 'index.html';
+    await logout(true);
     return null;
   }
 
@@ -15,23 +17,26 @@ export async function requireRole(allowedRole = 'any') {
     profile = await getProfile(session.user.id);
   } catch (err) {
     console.error('Error fetching profile:', err);
-    await logout();
+    await logout(true, 'Failed to fetch user profile');
     return null;
   }
 
   if (!profile || !profile.is_active) {
-    alert('Account disabled or inactive. Contact your team lead.');
-    await logout();
+    await logout(true, 'Account disabled or inactive. Contact your team lead.');
     return null;
   }
 
   if (allowedRole === 'team_lead' && profile.role !== 'team_lead') {
-    window.location.href = rootPath + 'tech/dashboard.html';
+    if (!window.location.pathname.includes('tech/dashboard.html')) {
+      window.location.href = rootPath + 'tech/dashboard.html';
+    }
     return null;
   }
 
   if (allowedRole === 'technician' && profile.role !== 'technician') {
-    window.location.href = rootPath + 'lead/schedule.html';
+    if (!window.location.pathname.includes('lead/schedule.html')) {
+      window.location.href = rootPath + 'lead/schedule.html';
+    }
     return null;
   }
 
