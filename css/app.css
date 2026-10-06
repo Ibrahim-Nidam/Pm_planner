@@ -144,6 +144,33 @@ td.hover-cell {
   width: max-content !important;
 }
 
+.roster-grid-scroll {
+  display: block !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  overflow-x: auto !important;
+  overflow-y: hidden;
+  touch-action: pan-x;
+}
+
+.roster-table {
+  width: 1650px !important;
+  min-width: 1650px !important;
+  table-layout: fixed !important;
+}
+
+.roster-table th:not(:first-child),
+.roster-table td:not(:first-child) {
+  width: 48px !important;
+  min-width: 48px !important;
+}
+
+.roster-table th:first-child,
+.roster-table td:first-child {
+  width: 150px !important;
+  min-width: 150px !important;
+}
+
 .top-bar-nav {
   min-width: 0;
   -webkit-overflow-scrolling: touch;
@@ -282,6 +309,16 @@ td.hover-cell {
   .schedule-roster-table {
     table-layout: fixed;
     min-width: max-content !important;
+  }
+
+  .roster-grid-scroll {
+    overflow-x: scroll !important;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .roster-table {
+    width: 1650px !important;
+    min-width: 1650px !important;
   }
 
   .grid-container .sticky,

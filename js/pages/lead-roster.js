@@ -148,8 +148,8 @@ async function renderPage(profile) {
     ${warningsHtml}
 
     <div class="bg-white rounded-2xl shadow-sm overflow-hidden space-y-2">
-      <div class="grid-container">
-        <table class="roster-table min-w-[1280px] text-left border-collapse">
+      <div class="grid-container roster-grid-scroll">
+        <table class="roster-table text-left border-collapse">
           <thead>
             <tr class="bg-slate-50 border-b border-slate-100">
               <th class="sticky-corner p-3 text-xs font-bold text-slate-700 border-r border-slate-100 min-w-[160px]">Technician</th>
