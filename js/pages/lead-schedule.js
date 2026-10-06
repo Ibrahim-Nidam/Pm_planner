@@ -169,7 +169,7 @@ async function renderPage(profile) {
     app.innerHTML = `
       <div class="space-y-6 max-w-full">
         <!-- Action Bar -->
-        <div class="bg-white p-4 rounded-2xl shadow-sm flex flex-wrap items-center justify-between gap-4">
+        <div class="schedule-action-bar bg-white p-4 rounded-2xl shadow-sm flex flex-wrap items-center justify-between gap-4">
           <div class="flex items-center gap-4">
             <div id="month-selector-container"></div>
             ${renderStatusBadge(status)}
@@ -204,7 +204,7 @@ async function renderPage(profile) {
           </div>
 
           <div class="grid-container border border-slate-200 rounded-xl overflow-x-auto">
-            <table class="min-w-[1300px] border-separate">
+            <table class="schedule-matrix-table min-w-[1650px] border-separate">
               <thead>
                 <tr class="bg-slate-50">
                   <th class="px-3 py-2 text-xs font-bold text-slate-700 text-left sticky left-0 bg-slate-50 z-20 min-w-[80px] w-[80px] border-r border-slate-200">Machine</th>
@@ -232,7 +232,7 @@ async function renderPage(profile) {
           </div>
 
           <div class="grid-container border border-slate-200 rounded-xl overflow-hidden">
-            <table class="w-full table-fixed border-separate">
+            <table class="schedule-roster-table min-w-[1280px] table-fixed border-separate">
               <thead>
                 <tr class="bg-slate-50">
                   <th class="px-2 py-2 text-xs font-bold text-slate-700 text-left w-[140px] border-r border-slate-200">Technician</th>

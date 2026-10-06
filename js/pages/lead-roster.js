@@ -62,16 +62,16 @@ async function renderPage(profile) {
 
   // Header Controls
   const headerHtml = `
-    <div class="flex flex-wrap items-center justify-between gap-4 bg-white p-4 rounded-2xl shadow-sm">
+    <div class="roster-action-bar flex flex-wrap items-center justify-between gap-4 bg-white p-4 rounded-2xl shadow-sm">
       <div class="flex items-center gap-3">
         <div id="month-selector"></div>
         <span class="text-xs font-semibold text-slate-500 bg-slate-100 px-3 py-1 rounded-full">
-          Click cell to cycle: D (Day) &rarr; N (Night) &rarr; R (Rest)
+          Tap a cell to cycle: D (Day) &rarr; N (Night) &rarr; R (Rest)
         </span>
       </div>
 
       <button id="generate-cycle-btn" class="px-4 py-2 bg-slate-900 text-white font-semibold text-xs sm:text-sm rounded-xl hover:bg-slate-800 transition-all">
-        Generate from Cycle
+        Fill Missing From Cycle
       </button>
     </div>
   `;
@@ -149,7 +149,7 @@ async function renderPage(profile) {
 
     <div class="bg-white rounded-2xl shadow-sm overflow-hidden space-y-2">
       <div class="grid-container">
-        <table class="w-full text-left border-collapse">
+        <table class="roster-table min-w-[1280px] text-left border-collapse">
           <thead>
             <tr class="bg-slate-50 border-b border-slate-100">
               <th class="sticky-corner p-3 text-xs font-bold text-slate-700 border-r border-slate-100 min-w-[160px]">Technician</th>
@@ -209,11 +209,14 @@ async function renderPage(profile) {
           if (cyclePos === 0) shiftType = 'day';
           else if (cyclePos === 1) shiftType = 'night';
 
-          upsertPayload.push({
-            technician_id: tech.id,
-            shift_date: dayStr,
-            shift_type: shiftType
-          });
+          const alreadyStored = (shiftRows || []).some(s => s.technician_id === tech.id && s.shift_date === dayStr);
+          if (!alreadyStored) {
+            upsertPayload.push({
+              technician_id: tech.id,
+              shift_date: dayStr,
+              shift_type: shiftType
+            });
+          }
         }
       }
 

@@ -193,6 +193,73 @@ td.hover-cell {
     max-width: 100vw;
     padding: 1rem;
   }
+
+  .roster-action-bar,
+  .schedule-action-bar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .roster-action-bar > div,
+  .schedule-action-bar > div {
+    width: 100%;
+  }
+
+  .roster-action-bar > div:first-child,
+  .schedule-action-bar > div:first-child {
+    flex-wrap: wrap;
+  }
+
+  .roster-action-bar > button {
+    width: 100%;
+  }
+
+  .roster-action-bar span {
+    white-space: normal;
+    line-height: 1.35;
+  }
+
+  .schedule-action-bar > div:last-child {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .schedule-action-bar > div:last-child > * {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .schedule-action-bar > div:last-child > label {
+    grid-column: 1 / -1;
+    justify-content: flex-start;
+  }
+
+  .roster-table,
+  .schedule-matrix-table,
+  .schedule-roster-table {
+    table-layout: fixed;
+  }
+
+  .roster-table th:not(:first-child),
+  .roster-table td:not(:first-child),
+  .schedule-matrix-table th[data-date],
+  .schedule-matrix-table td.grid-cell,
+  .schedule-roster-table th[data-date],
+  .schedule-roster-table td.grid-cell {
+    min-width: 48px !important;
+    width: 48px !important;
+  }
+
+  .roster-table th:first-child,
+  .roster-table td:first-child {
+    min-width: 150px;
+    width: 150px;
+  }
+
+  .roster-cell {
+    min-height: 44px !important;
+    padding: 0.65rem 0.35rem !important;
+  }
 }
 
 /* Print Stylesheet (SPECS §10.5) */
