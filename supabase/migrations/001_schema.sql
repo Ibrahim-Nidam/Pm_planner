@@ -54,6 +54,7 @@ create table public.schedule_months (
   id           uuid primary key default gen_random_uuid(),
   month        date not null unique check (extract(day from month) = 1), -- first day of the month
   status       text not null default 'draft' check (status in ('draft', 'approved')),
+  pm_start_armed boolean not null default true,
   generated_at timestamptz,
   approved_by  uuid references public.profiles(id),
   approved_at  timestamptz

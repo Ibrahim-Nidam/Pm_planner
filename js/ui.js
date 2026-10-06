@@ -17,12 +17,12 @@ export function renderTopBar(containerEl, profile, title = "PM Planner") {
 
   containerEl.innerHTML = `
     <header class="bg-white shadow-sm mb-4 sticky top-0 z-40">
-      <div class="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex flex-wrap items-center justify-between gap-2">
-        <div class="flex items-center gap-4">
-          <span class="font-bold text-lg text-slate-900 tracking-tight">${title}</span>
+      <div class="top-bar-inner max-w-7xl mx-auto px-4 sm:px-6 py-3 flex flex-wrap items-center justify-between gap-2">
+        <div class="top-bar-main flex items-center gap-4 min-w-0">
+          <span class="font-bold text-lg text-slate-900 tracking-tight truncate">${title}</span>
           ${leadNav}
         </div>
-        <div class="flex items-center gap-3">
+        <div class="top-bar-user flex items-center gap-3 shrink-0">
           <span class="text-xs sm:text-sm font-medium text-slate-600">${profile.full_name}</span>
           <a href="${rootPath}profile.html" class="text-xs sm:text-sm font-medium text-slate-600 hover:text-slate-900 px-2 py-1 bg-slate-100 rounded-md">Profile</a>
           <button id="logout-btn" class="text-xs sm:text-sm font-medium text-rose-600 hover:text-rose-700 px-2 py-1 bg-rose-50 rounded-md cursor-pointer">Sign Out</button>

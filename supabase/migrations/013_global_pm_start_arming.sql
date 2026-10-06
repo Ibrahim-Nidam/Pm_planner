@@ -1,19 +1,10 @@
--- 012_pm_start_arming.sql -- Allow leads to unlock a PM for an off-schedule start.
-
-alter table public.pm_tasks
-  add column if not exists is_armed boolean not null default true;
+-- 013_global_pm_start_arming.sql -- Move PM start arming to the schedule month.
 
 alter table public.schedule_months
   add column if not exists pm_start_armed boolean not null default true;
 
 comment on column public.schedule_months.pm_start_armed is
   'When true, technicians may start PMs only on their scheduled or tolerance night.';
-
-comment on column public.pm_tasks.is_armed is
-  'When true, the technician may start only on the scheduled or tolerance night.';
-
-create index if not exists pm_tasks_armed_idx on public.pm_tasks (is_armed)
-  where status = 'scheduled';
 
 create or replace function public.start_pm(p_task_id uuid, p_postpone_reason text default null)
 returns public.pm_tasks

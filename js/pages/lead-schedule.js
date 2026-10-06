@@ -164,6 +164,10 @@ async function renderPage(profile) {
             ${renderStatusBadge(status)}
           </div>
           <div class="flex items-center gap-2 flex-wrap">
+            <label class="inline-flex items-center gap-2 px-3 py-2.5 bg-slate-50 rounded-xl text-xs font-semibold text-slate-700 cursor-pointer min-h-[44px]">
+              <input id="armed-toggle" type="checkbox" class="w-5 h-5 accent-emerald-600" ${monthRow?.pm_start_armed !== false ? 'checked' : ''} ${!monthRow ? 'disabled' : ''}>
+              <span>Armed start rule</span>
+            </label>
             <button id="add-pm-btn" class="px-4 py-2.5 bg-slate-800 text-white font-semibold text-xs sm:text-sm rounded-xl hover:bg-slate-700 transition-all shadow-sm cursor-pointer flex items-center gap-1.5">
               <span>+</span> Add PM Task
             </button>
@@ -289,6 +293,28 @@ async function renderPage(profile) {
       currentMonthStr = newMonth;
       await renderPage(profile);
     });
+
+    const armedToggle = document.getElementById('armed-toggle');
+    if (armedToggle && monthRow) {
+      armedToggle.addEventListener('change', async () => {
+        armedToggle.disabled = true;
+        try {
+          const { error: updateErr } = await supabase
+            .from('schedule_months')
+            .update({ pm_start_armed: armedToggle.checked })
+            .eq('id', monthRow.id);
+
+          if (updateErr) throw updateErr;
+          monthRow.pm_start_armed = armedToggle.checked;
+          showToast(armedToggle.checked ? 'PM start rule armed for this month' : 'PMs unlocked for off-schedule starts', 'success');
+        } catch (err) {
+          armedToggle.checked = !armedToggle.checked;
+          showToast(`Arming update failed: ${err.message}`, 'error');
+        } finally {
+          armedToggle.disabled = false;
+        }
+      });
+    }
 
     // Attach Task Pill Click Handler
     app.querySelectorAll('.task-pill').forEach(btn => {
@@ -665,20 +691,6 @@ async function openDrawer(task, profile, technicians, shiftRows, monthRow) {
         <div>${renderStatusBadge(task.status)}</div>
       </div>
 
-      ${task.status === 'scheduled' ? `
-        <div class="border-t border-slate-100 pt-4 flex items-center justify-between gap-3">
-          <div>
-            <span class="text-slate-900 block text-xs font-bold">Armed start rule</span>
-            <span class="text-slate-400 block text-[10px]">Limit start to the scheduled or tolerance night</span>
-          </div>
-          <label class="relative inline-flex items-center cursor-pointer shrink-0">
-            <input id="armed-toggle" type="checkbox" class="sr-only peer" ${task.is_armed !== false ? 'checked' : ''}>
-            <span class="w-11 h-6 bg-slate-200 rounded-full peer peer-checked:bg-emerald-600 transition-colors"></span>
-            <span class="absolute left-1 top-1 w-4 h-4 bg-white rounded-full shadow-sm transition-transform peer-checked:translate-x-5"></span>
-          </label>
-        </div>
-      ` : ''}
-
       ${task.notes ? `
         <div class="space-y-1">
           <span class="text-slate-400 block text-[10px] uppercase font-bold">Technician Notes</span>
@@ -736,29 +748,6 @@ async function openDrawer(task, profile, technicians, shiftRows, monthRow) {
   document.getElementById('close-drawer').addEventListener('click', () => {
     backdrop.classList.add('hidden');
   });
-
-  const armedToggle = document.getElementById('armed-toggle');
-  if (armedToggle) {
-    armedToggle.addEventListener('change', async () => {
-      armedToggle.disabled = true;
-      try {
-        const { error: updateErr } = await supabase
-          .from('pm_tasks')
-          .update({ is_armed: armedToggle.checked, updated_at: new Date().toISOString() })
-          .eq('id', task.id)
-          .eq('status', 'scheduled');
-
-        if (updateErr) throw updateErr;
-        task.is_armed = armedToggle.checked;
-        showToast(armedToggle.checked ? 'PM start rule armed' : 'PM unlocked for an off-schedule start', 'success');
-      } catch (err) {
-        armedToggle.checked = !armedToggle.checked;
-        showToast(`Arming update failed: ${err.message}`, 'error');
-      } finally {
-        armedToggle.disabled = false;
-      }
-    });
-  }
 
   // Delete individual task handler
   const delTaskBtn = document.getElementById('delete-task-btn');
