@@ -218,7 +218,7 @@ async function renderPage(profile) {
       }
 
       if (upsertPayload.length > 0) {
-        const { error: upsertErr } = await supabase.from('shifts').upsert(upsertPayload, { onConflict: 'technician_id,shift_date' });
+        const { error: upsertErr } = await supabase.rpc('save_shifts', { p_shifts: upsertPayload });
         if (upsertErr) throw upsertErr;
       }
 
@@ -256,13 +256,11 @@ async function renderPage(profile) {
       }
 
       try {
-        const { error: upsertErr } = await supabase
-          .from('shifts')
-          .upsert({
-            technician_id: techId,
-            shift_date: dateStr,
-            shift_type: nextShift
-          }, { onConflict: 'technician_id,shift_date' });
+        const { error: upsertErr } = await supabase.rpc('save_shift', {
+          p_technician_id: techId,
+          p_shift_date: dateStr,
+          p_shift_type: nextShift
+        });
 
         if (upsertErr) throw upsertErr;
         await renderPage(profile);
