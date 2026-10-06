@@ -99,7 +99,9 @@ async function renderTaskDetails(profile, serverCtx) {
   // Validation flags for Start Button
   const isNightTime = serverCtx.is_night;
   const isScheduledNight = tonightNightDate === task.scheduled_date;
-  const isArmed = armedSetting ? armedSetting.value !== 'false' : task.schedule_months?.pm_start_armed !== false;
+  const isArmed = armedSetting
+    ? armedSetting.value !== 'false'
+    : task.is_armed !== false && task.schedule_months?.pm_start_armed !== false;
   const isToleranceNight = isArmed && tonightNightDate === task.latest_allowed_date && task.latest_allowed_date > task.scheduled_date;
   const canStartNight = !isArmed || isScheduledNight || isToleranceNight;
   

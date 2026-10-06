@@ -36,7 +36,6 @@ async function renderPage(profile) {
       .eq('key', 'pm_start_armed')
       .maybeSingle();
     if (armedSettingError) throw armedSettingError;
-    const pmStartArmed = armedSetting?.value !== 'false';
 
     const status = monthRow ? monthRow.status : 'draft';
 
@@ -62,6 +61,10 @@ async function renderPage(profile) {
         .eq('month_id', monthRow.id);
       if (taskRows) tasks = taskRows;
     }
+
+    const pmStartArmed = armedSetting
+      ? armedSetting.value !== 'false'
+      : tasks.every(task => task.is_armed !== false);
 
     // 5. Fetch shifts for the month
     const [year, monthNum] = currentMonthStr.split('-').map(Number);
@@ -315,6 +318,12 @@ async function renderPage(profile) {
             .single();
 
           if (updateErr) throw updateErr;
+          const { error: taskUpdateError } = await supabase
+            .from('pm_tasks')
+            .update({ is_armed: requestedValue, updated_at: new Date().toISOString() })
+            .eq('status', 'scheduled');
+
+          if (taskUpdateError) throw taskUpdateError;
           armedToggle.checked = savedSetting.value === 'true';
           showToast(armedToggle.checked ? 'PM start rule armed globally' : 'PMs unlocked globally for off-schedule starts', 'success');
         } catch (err) {
