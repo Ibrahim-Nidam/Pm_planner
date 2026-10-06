@@ -90,10 +90,16 @@ async function renderTaskDetails(profile, serverCtx) {
   const isApproved = task.schedule_months?.status === 'approved';
   const tonightNightDate = serverCtx.night_date;
 
+  const { data: armedSetting } = await supabase
+    .from('app_settings')
+    .select('value')
+    .eq('key', 'pm_start_armed')
+    .maybeSingle();
+
   // Validation flags for Start Button
   const isNightTime = serverCtx.is_night;
   const isScheduledNight = tonightNightDate === task.scheduled_date;
-  const isArmed = task.schedule_months?.pm_start_armed !== false;
+  const isArmed = armedSetting ? armedSetting.value !== 'false' : task.schedule_months?.pm_start_armed !== false;
   const isToleranceNight = isArmed && tonightNightDate === task.latest_allowed_date && task.latest_allowed_date > task.scheduled_date;
   const canStartNight = !isArmed || isScheduledNight || isToleranceNight;
   

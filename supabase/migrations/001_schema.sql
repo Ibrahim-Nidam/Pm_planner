@@ -12,7 +12,8 @@ insert into public.app_settings (key, value) values
   ('night_end',                    '08:30'),
   ('second_pm_gap_days',           '14'),
   ('second_pm_gap_tolerance_days', '2'),
-  ('max_photos_per_pm',            '5');
+  ('max_photos_per_pm',            '5'),
+  ('pm_start_armed',               'true');
 
 create table public.profiles (
   id                   uuid primary key references auth.users(id) on delete cascade,

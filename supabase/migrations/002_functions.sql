@@ -71,7 +71,7 @@ begin
     raise exception 'Finish your current PM before starting another';
   end if;
 
-  if coalesce(m.pm_start_armed, true) then
+  if coalesce(public.setting('pm_start_armed'), 'true') = 'true' then
     if nd = t.scheduled_date then
       is_postponed := false;
     elsif nd = t.latest_allowed_date and t.latest_allowed_date > t.scheduled_date then

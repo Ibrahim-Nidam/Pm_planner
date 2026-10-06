@@ -30,6 +30,14 @@ async function renderPage(profile) {
       .eq('month', currentMonthStr)
       .maybeSingle();
 
+    const { data: armedSetting, error: armedSettingError } = await supabase
+      .from('app_settings')
+      .select('value')
+      .eq('key', 'pm_start_armed')
+      .maybeSingle();
+    if (armedSettingError) throw armedSettingError;
+    const pmStartArmed = armedSetting?.value !== 'false';
+
     const status = monthRow ? monthRow.status : 'draft';
 
     // 2. Fetch machines
@@ -165,7 +173,7 @@ async function renderPage(profile) {
           </div>
           <div class="flex items-center gap-2 flex-wrap">
             <label class="inline-flex items-center gap-2 px-3 py-2.5 bg-slate-50 rounded-xl text-xs font-semibold text-slate-700 cursor-pointer min-h-[44px]">
-              <input id="armed-toggle" type="checkbox" class="w-5 h-5 accent-emerald-600" ${monthRow?.pm_start_armed !== false ? 'checked' : ''} ${!monthRow ? 'disabled' : ''}>
+              <input id="armed-toggle" type="checkbox" class="w-5 h-5 accent-emerald-600" ${pmStartArmed ? 'checked' : ''}>
               <span>Armed start rule</span>
             </label>
             <button id="add-pm-btn" class="px-4 py-2.5 bg-slate-800 text-white font-semibold text-xs sm:text-sm rounded-xl hover:bg-slate-700 transition-all shadow-sm cursor-pointer flex items-center gap-1.5">
@@ -295,20 +303,22 @@ async function renderPage(profile) {
     });
 
     const armedToggle = document.getElementById('armed-toggle');
-    if (armedToggle && monthRow) {
+    if (armedToggle) {
       armedToggle.addEventListener('change', async () => {
+        const requestedValue = armedToggle.checked;
         armedToggle.disabled = true;
         try {
-          const { error: updateErr } = await supabase
-            .from('schedule_months')
-            .update({ pm_start_armed: armedToggle.checked })
-            .eq('id', monthRow.id);
+          const { data: savedSetting, error: updateErr } = await supabase
+            .from('app_settings')
+            .upsert({ key: 'pm_start_armed', value: String(requestedValue) }, { onConflict: 'key' })
+            .select('value')
+            .single();
 
           if (updateErr) throw updateErr;
-          monthRow.pm_start_armed = armedToggle.checked;
-          showToast(armedToggle.checked ? 'PM start rule armed for this month' : 'PMs unlocked for off-schedule starts', 'success');
+          armedToggle.checked = savedSetting.value === 'true';
+          showToast(armedToggle.checked ? 'PM start rule armed globally' : 'PMs unlocked globally for off-schedule starts', 'success');
         } catch (err) {
-          armedToggle.checked = !armedToggle.checked;
+          armedToggle.checked = !requestedValue;
           showToast(`Arming update failed: ${err.message}`, 'error');
         } finally {
           armedToggle.disabled = false;
