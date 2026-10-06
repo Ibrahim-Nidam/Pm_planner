@@ -93,10 +93,11 @@ async function renderTaskDetails(profile, serverCtx) {
   // Validation flags for Start Button
   const isNightTime = serverCtx.is_night;
   const isScheduledNight = tonightNightDate === task.scheduled_date;
-  const isToleranceNight = tonightNightDate === task.latest_allowed_date && task.latest_allowed_date > task.scheduled_date;
-  const canStartNight = isScheduledNight || isToleranceNight;
+  const isArmed = task.is_armed !== false;
+  const isToleranceNight = isArmed && tonightNightDate === task.latest_allowed_date && task.latest_allowed_date > task.scheduled_date;
+  const canStartNight = !isArmed || isScheduledNight || isToleranceNight;
   
-  const isOverdue = task.status === 'scheduled' && tonightNightDate > task.latest_allowed_date;
+  const isOverdue = isArmed && task.status === 'scheduled' && tonightNightDate > task.latest_allowed_date;
   const canStart = isTechnician && isOwner && isApproved && task.status === 'scheduled' && isNightTime && canStartNight;
 
   // Start disabled reason string
@@ -104,7 +105,7 @@ async function renderTaskDetails(profile, serverCtx) {
   if (!isApproved) startDisabledReason = 'Schedule is not published yet.';
   else if (task.status !== 'scheduled') startDisabledReason = `Task is ${task.status}.`;
   else if (isOverdue) startDisabledReason = 'This task is overdue and requires lead re-planning.';
-  else if (!isNightTime) startDisabledReason = `Available on ${formatDateDDMMYYYY(task.scheduled_date)} during night shift (20:30 - 08:30).`;
+  else if (!isNightTime) startDisabledReason = 'Available during the night shift (20:30 - 08:30).';
   else if (!canStartNight) startDisabledReason = `Scheduled for night of ${formatDateDDMMYYYY(task.scheduled_date)}.`;
 
   let photosHtml = photoUrls.map((p, idx) => `
@@ -180,7 +181,7 @@ async function renderTaskDetails(profile, serverCtx) {
         <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 bg-slate-50 p-4 rounded-xl">
           <div>
             <span class="block text-[10px] font-semibold uppercase text-slate-400">Started</span>
-            <span class="font-bold text-slate-800 text-xs">${formatTime24h(task.started_at)}</span>
+            <span class="font-bold text-slate-800 text-xs">${formatDateDDMMYYYY(task.started_at)} ${formatTime24h(task.started_at)}</span>
           </div>
           <div>
             <span class="block text-[10px] font-semibold uppercase text-slate-400">Ended</span>

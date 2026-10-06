@@ -68,6 +68,7 @@ create table public.pm_tasks (
   scheduled_date      date not null,   -- the NIGHT date (the date the night shift starts)
   latest_allowed_date date not null,   -- tolerance date; equals scheduled_date when no tolerance
   status              text not null default 'scheduled' check (status in ('scheduled', 'in_progress', 'completed')),
+  is_armed            boolean not null default true,
   started_at          timestamptz,
   ended_at            timestamptz,
   postponed           boolean not null default false,

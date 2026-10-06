@@ -71,15 +71,17 @@ begin
     raise exception 'Finish your current PM before starting another';
   end if;
 
-  if nd = t.scheduled_date then
-    is_postponed := false;
-  elsif nd = t.latest_allowed_date and t.latest_allowed_date > t.scheduled_date then
-    if coalesce(trim(p_postpone_reason), '') = '' then
-      raise exception 'A reason is required to postpone a PM';
+  if coalesce(t.is_armed, true) then
+    if nd = t.scheduled_date then
+      is_postponed := false;
+    elsif nd = t.latest_allowed_date and t.latest_allowed_date > t.scheduled_date then
+      if coalesce(trim(p_postpone_reason), '') = '' then
+        raise exception 'A reason is required to postpone a PM';
+      end if;
+      is_postponed := true;
+    else
+      raise exception 'This PM is not scheduled for tonight';
     end if;
-    is_postponed := true;
-  else
-    raise exception 'This PM is not scheduled for tonight';
   end if;
 
   update public.pm_tasks
