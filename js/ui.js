@@ -7,11 +7,11 @@ export function renderTopBar(containerEl, profile, title = "PM Planner") {
   const rootPath = isSubFolder ? '../' : './';
   
   const leadNav = profile.role === 'team_lead' ? `
-    <div class="flex items-center gap-1 sm:gap-2 overflow-x-auto py-1">
-      <a href="${rootPath}lead/schedule.html" class="px-3 py-1.5 text-xs sm:text-sm font-medium rounded-lg transition-colors ${window.location.pathname.includes('schedule') ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-100'}">Schedule</a>
-      <a href="${rootPath}lead/roster.html" class="px-3 py-1.5 text-xs sm:text-sm font-medium rounded-lg transition-colors ${window.location.pathname.includes('roster') ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-100'}">Roster</a>
-      <a href="${rootPath}lead/machines.html" class="px-3 py-1.5 text-xs sm:text-sm font-medium rounded-lg transition-colors ${window.location.pathname.includes('machines') ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-100'}">Machines</a>
-      <a href="${rootPath}lead/technicians.html" class="px-3 py-1.5 text-xs sm:text-sm font-medium rounded-lg transition-colors ${window.location.pathname.includes('technicians') ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-100'}">Technicians</a>
+    <div class="top-bar-nav flex items-center gap-1 sm:gap-2 overflow-x-auto py-1">
+      <a href="${rootPath}lead/schedule.html" class="top-bar-link px-3 py-1.5 text-xs sm:text-sm font-medium rounded-lg transition-colors ${window.location.pathname.includes('schedule') ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-100'}">Schedule</a>
+      <a href="${rootPath}lead/roster.html" class="top-bar-link px-3 py-1.5 text-xs sm:text-sm font-medium rounded-lg transition-colors ${window.location.pathname.includes('roster') ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-100'}">Roster</a>
+      <a href="${rootPath}lead/machines.html" class="top-bar-link px-3 py-1.5 text-xs sm:text-sm font-medium rounded-lg transition-colors ${window.location.pathname.includes('machines') ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-100'}">Machines</a>
+      <a href="${rootPath}lead/technicians.html" class="top-bar-link px-3 py-1.5 text-xs sm:text-sm font-medium rounded-lg transition-colors ${window.location.pathname.includes('technicians') ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-100'}">Technicians</a>
     </div>
   ` : '';
 
@@ -23,7 +23,7 @@ export function renderTopBar(containerEl, profile, title = "PM Planner") {
           ${leadNav}
         </div>
         <div class="top-bar-user flex items-center gap-3 shrink-0">
-          <span class="text-xs sm:text-sm font-medium text-slate-600">${profile.full_name}</span>
+          <span class="top-bar-name text-xs sm:text-sm font-medium text-slate-600">${profile.full_name}</span>
           <a href="${rootPath}profile.html" class="text-xs sm:text-sm font-medium text-slate-600 hover:text-slate-900 px-2 py-1 bg-slate-100 rounded-md">Profile</a>
           <button id="logout-btn" class="text-xs sm:text-sm font-medium text-rose-600 hover:text-rose-700 px-2 py-1 bg-rose-50 rounded-md cursor-pointer">Sign Out</button>
         </div>

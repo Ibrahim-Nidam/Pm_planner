@@ -62,8 +62,10 @@ button:not(.task-pill), input, select, textarea, a.btn-touch {
 
 /* Schedule Grid Sticky Layout & Crisp Matrix Lines */
 .grid-container {
+  display: block;
   overflow-x: auto;
   max-width: 100%;
+  width: 100%;
   -webkit-overflow-scrolling: touch;
   overscroll-behavior-x: contain;
 }
@@ -74,6 +76,8 @@ button:not(.task-pill), input, select, textarea, a.btn-touch {
 }
 
 .grid-container table {
+  width: max-content;
+  min-width: 100%;
   background-color: #cbd5e1 !important; /* Crisp slate-300 gridlines via 1px cell separation */
   border-spacing: 1px !important;
   border-collapse: separate !important;
@@ -133,6 +137,23 @@ td.hover-cell {
   z-index: 40;
 }
 
+.roster-table,
+.schedule-matrix-table,
+.schedule-roster-table {
+  width: max-content !important;
+}
+
+.top-bar-nav {
+  min-width: 0;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+}
+
+.top-bar-nav::-webkit-scrollbar {
+  display: none;
+}
+
 @media (max-width: 640px) {
   .top-bar-inner {
     align-items: stretch;
@@ -145,23 +166,44 @@ td.hover-cell {
   }
 
   .top-bar-main {
-    align-items: center;
+    align-items: stretch;
+    flex-direction: column;
     gap: 0.75rem;
   }
 
   .top-bar-main > span {
-    max-width: 42vw;
+    max-width: 100%;
   }
 
   .top-bar-main > div {
-    flex: 1;
+    flex: none;
     min-width: 0;
+  }
+
+  .top-bar-nav {
+    width: 100%;
+  }
+
+  .top-bar-link {
+    flex: 0 0 auto;
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+    white-space: nowrap;
   }
 
   .top-bar-user {
     justify-content: space-between;
     border-top: 1px solid #f1f5f9;
     padding-top: 0.5rem;
+  }
+
+  .top-bar-name {
+    min-width: 0;
+    max-width: 45%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   #app {
@@ -238,6 +280,7 @@ td.hover-cell {
   .schedule-matrix-table,
   .schedule-roster-table {
     table-layout: fixed;
+    min-width: max-content !important;
   }
 
   .roster-table th:not(:first-child),
