@@ -92,6 +92,50 @@ export function showToast(message, type = 'info') {
   }, 4000);
 }
 
+export function confirmAction(message, options = {}) {
+  const {
+    title = 'Confirm action',
+    confirmLabel = 'Continue',
+    danger = false
+  } = options;
+
+  return new Promise((resolve) => {
+    const existing = document.getElementById('confirm-modal');
+    if (existing) existing.remove();
+
+    const modal = document.createElement('div');
+    modal.id = 'confirm-modal';
+    modal.className = 'fixed inset-0 z-50 bg-slate-950/40 backdrop-blur-sm flex items-center justify-center p-4';
+    modal.innerHTML = `
+      <div class="w-full max-w-md bg-white rounded-2xl shadow-2xl p-5 sm:p-6 space-y-5" role="dialog" aria-modal="true">
+        <div class="space-y-2">
+          <h2 class="confirm-title text-lg font-bold text-slate-900"></h2>
+          <p class="confirm-message text-sm leading-6 text-slate-600"></p>
+        </div>
+        <div class="flex flex-col-reverse sm:flex-row sm:justify-end gap-2">
+          <button type="button" data-confirm-cancel class="min-h-[44px] px-4 py-2.5 rounded-xl bg-slate-100 text-slate-700 font-semibold text-sm hover:bg-slate-200">Cancel</button>
+          <button type="button" data-confirm-ok class="min-h-[44px] px-4 py-2.5 rounded-xl text-white font-semibold text-sm ${danger ? 'bg-rose-700 hover:bg-rose-800' : 'bg-slate-900 hover:bg-slate-800'}"></button>
+        </div>
+      </div>
+    `;
+    modal.querySelector('.confirm-title').textContent = title;
+    modal.querySelector('.confirm-message').textContent = message;
+    modal.querySelector('[data-confirm-ok]').textContent = confirmLabel;
+    document.body.appendChild(modal);
+
+    const finish = (result) => {
+      modal.remove();
+      resolve(result);
+    };
+
+    modal.querySelector('[data-confirm-cancel]').addEventListener('click', () => finish(false));
+    modal.querySelector('[data-confirm-ok]').addEventListener('click', () => finish(true));
+    modal.addEventListener('click', (event) => {
+      if (event.target === modal) finish(false);
+    });
+  });
+}
+
 export function renderMonthSelector(containerEl, currentMonthStr, onChange) {
   if (!containerEl) return;
   const parts = currentMonthStr.split('-');

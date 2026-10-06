@@ -2,7 +2,7 @@
 import { requireRole } from '../guard.js';
 import { supabase } from '../supabase-client.js';
 import { formatDateDDMMYYYY, formatTime24h, formatDurationMinutes } from '../time.js';
-import { renderTopBar, renderStatusBadge, renderMonthSelector, showToast, openPhotoLightbox } from '../ui.js';
+import { renderTopBar, renderStatusBadge, renderMonthSelector, showToast, openPhotoLightbox, confirmAction } from '../ui.js';
 import { generateSchedule, nightsFromCycle, getCycleShiftForDate, toleranceDate } from '../scheduler.js';
 
 let currentMonthStr = '2026-10-01'; // default to acceptance test month
@@ -392,7 +392,7 @@ async function renderPage(profile) {
     if (clearBtn) {
       clearBtn.addEventListener('click', async () => {
         if (!monthRow) return;
-        if (!confirm(`Are you sure you want to CLEAR all un-started PM tasks for ${currentMonthStr}? The schedule will be reset to draft state so you can re-generate.`)) return;
+        if (!await confirmAction(`Clear all un-started PM tasks for ${currentMonthStr}? The schedule will return to draft state.`, { title: 'Clear schedule', confirmLabel: 'Clear schedule', danger: true })) return;
 
         try {
           const { data: resetRow, error: clearErr } = await supabase
@@ -478,7 +478,7 @@ async function renderPage(profile) {
     // Generate Button Handler
     document.getElementById('generate-btn').addEventListener('click', async () => {
       if (status === 'approved') return;
-      if (!confirm('Generate monthly PM schedule? Existing un-started tasks for this month will be replaced.')) return;
+      if (!await confirmAction('Generate the monthly PM schedule? Existing un-started tasks for this month will be replaced.', { title: 'Generate schedule', confirmLabel: 'Generate schedule' })) return;
 
       try {
         showToast("Generating schedule...", "info");
@@ -593,7 +593,7 @@ async function renderPage(profile) {
     // Approve Button Handler (uses security definer RPC to bypass RLS)
     document.getElementById('approve-btn').addEventListener('click', async () => {
       if (!monthRow || monthRow.status === 'approved') return;
-      if (!confirm('Approve PM schedule? Technicians will be able to see their assigned PM tasks immediately.')) return;
+      if (!await confirmAction('Approve this PM schedule? Technicians will be able to see their assigned PM tasks immediately.', { title: 'Approve schedule', confirmLabel: 'Approve schedule' })) return;
 
       try {
         const { data: approved, error: appErr } = await supabase
@@ -772,7 +772,7 @@ async function openDrawer(task, profile, technicians, shiftRows, monthRow) {
   const delTaskBtn = document.getElementById('delete-task-btn');
   if (delTaskBtn) {
     delTaskBtn.addEventListener('click', async () => {
-      if (!confirm(`Delete PM task for ${task.machines?.code}?`)) return;
+      if (!await confirmAction(`Delete the PM task for ${task.machines?.code}?`, { title: 'Delete PM task', confirmLabel: 'Delete task', danger: true })) return;
 
       try {
         const { error: delErr } = await supabase

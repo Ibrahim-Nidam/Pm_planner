@@ -2,7 +2,7 @@
 import { requireRole } from '../guard.js';
 import { supabase } from '../supabase-client.js';
 import { formatDateDDMMYYYY } from '../time.js';
-import { renderTopBar, showToast } from '../ui.js';
+import { renderTopBar, showToast, confirmAction } from '../ui.js';
 import { callEdgeFunction } from '../api.js';
 
 let allTechnicians = [];
@@ -242,7 +242,7 @@ async function renderPage(profile) {
     btn.addEventListener('click', async () => {
       const tId = btn.dataset.techId;
       const username = btn.dataset.techUsername;
-      if (!confirm(`Reset password for ${username} to default password?`)) return;
+      if (!await confirmAction(`Reset the password for ${username} to the default password?`, { title: 'Reset password', confirmLabel: 'Reset password', danger: true })) return;
 
       try {
         let res;

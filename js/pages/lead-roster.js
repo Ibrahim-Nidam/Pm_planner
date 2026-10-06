@@ -2,7 +2,7 @@
 import { requireRole } from '../guard.js';
 import { supabase } from '../supabase-client.js';
 import { formatDateDDMMYYYY } from '../time.js';
-import { renderTopBar, renderMonthSelector, showToast } from '../ui.js';
+import { renderTopBar, renderMonthSelector, showToast, confirmAction } from '../ui.js';
 import { nightsFromCycle, getCycleShiftForDate } from '../scheduler.js';
 
 let currentMonthStr = '2026-10-01';
@@ -173,7 +173,7 @@ async function renderPage(profile) {
 
   // Generate from Cycle Handler
   document.getElementById('generate-cycle-btn').addEventListener('click', async () => {
-    if (!confirm(`Generate shift roster from 4-day cycle for all active technicians for ${currentMonthStr.substring(0, 7)}? This will save cycle shifts for un-overridden days.`)) return;
+    if (!await confirmAction(`Fill missing shift cells from the 4-day cycle for ${currentMonthStr.substring(0, 7)}? Existing manual roster entries will be kept.`, { title: 'Fill roster from cycle', confirmLabel: 'Fill missing cells' })) return;
 
     try {
       showToast("Generating roster from cycles...", "info");

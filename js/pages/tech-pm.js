@@ -2,7 +2,7 @@
 import { requireRole } from '../guard.js';
 import { supabase } from '../supabase-client.js';
 import { fetchServerContext, initServerTimeSync, formatDateDDMMYYYY, formatTime24h, formatDurationMinutes } from '../time.js';
-import { renderTopBar, renderStatusBadge, showToast, openPhotoLightbox } from '../ui.js';
+import { renderTopBar, renderStatusBadge, showToast, openPhotoLightbox, confirmAction } from '../ui.js';
 
 let taskId = new URLSearchParams(window.location.search).get('id');
 
@@ -351,7 +351,7 @@ async function renderTaskDetails(profile, serverCtx) {
       const photoId = btn.dataset.photoId;
       const photoPath = btn.dataset.photoPath;
 
-      if (!confirm('Are you sure you want to delete this photo?')) return;
+      if (!await confirmAction('Delete this evidence photo?', { title: 'Delete photo', confirmLabel: 'Delete photo', danger: true })) return;
 
       try {
         await supabase.storage.from('pm-photos').remove([photoPath]);
@@ -368,7 +368,7 @@ async function renderTaskDetails(profile, serverCtx) {
   const endBtn = document.getElementById('end-pm-btn');
   if (endBtn) {
     endBtn.addEventListener('click', async () => {
-      if (!confirm('Are you sure you want to end and complete this PM?')) return;
+      if (!await confirmAction('End and complete this PM?', { title: 'Complete PM', confirmLabel: 'Complete PM' })) return;
 
       try {
         endBtn.disabled = true;

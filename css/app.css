@@ -68,6 +68,7 @@ button:not(.task-pill), input, select, textarea, a.btn-touch {
   width: 100%;
   -webkit-overflow-scrolling: touch;
   overscroll-behavior-x: contain;
+  touch-action: pan-x;
 }
 
 .overflow-x-auto {
@@ -281,6 +282,21 @@ td.hover-cell {
   .schedule-roster-table {
     table-layout: fixed;
     min-width: max-content !important;
+  }
+
+  .grid-container .sticky,
+  .grid-container .sticky-col-1,
+  .grid-container .sticky-col-2,
+  .grid-container .sticky-corner {
+    position: static !important;
+    left: auto !important;
+    top: auto !important;
+    z-index: auto !important;
+  }
+
+  .grid-container {
+    overflow-x: scroll;
+    scrollbar-width: thin;
   }
 
   .roster-table th:not(:first-child),
