@@ -153,6 +153,17 @@ td.hover-cell {
   touch-action: pan-x;
 }
 
+.schedule-roster-scroll {
+  display: block !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  overflow-x: auto !important;
+  overflow-y: hidden !important;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+  touch-action: pan-x;
+}
+
 .roster-table {
   width: 1650px !important;
   min-width: 1650px !important;
@@ -314,6 +325,10 @@ td.hover-cell {
   .roster-grid-scroll {
     overflow-x: scroll !important;
     -webkit-overflow-scrolling: touch;
+  }
+
+  .schedule-roster-scroll {
+    overflow-x: scroll !important;
   }
 
   .roster-table {

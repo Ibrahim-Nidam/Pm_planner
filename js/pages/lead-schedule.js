@@ -231,7 +231,7 @@ async function renderPage(profile) {
             </div>
           </div>
 
-          <div class="grid-container border border-slate-200 rounded-xl overflow-hidden">
+          <div class="schedule-roster-scroll grid-container border border-slate-200 rounded-xl overflow-hidden">
             <table class="schedule-roster-table min-w-[1280px] table-fixed border-separate">
               <thead>
                 <tr class="bg-slate-50">
