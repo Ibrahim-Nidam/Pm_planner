@@ -79,3 +79,37 @@ test('Acceptance Tests 1-5 (October 2026 Fleet Schedule)', () => {
   const secondRun = generateSchedule({ monthStart, machines, nightsByTech, settings });
   assert.deepEqual(tasks, secondRun.tasks, 'Scheduler output must be deterministic');
 });
+
+test('manual tasks remain fixed while generated tasks avoid their slots and dates', () => {
+  const fixedTasks = [
+    {
+      machine_id: 'm1',
+      technician_id: 'tech-1',
+      sequence: 1,
+      scheduled_date: '2026-10-01'
+    },
+    {
+      machine_id: 'm2',
+      technician_id: 'tech-1',
+      sequence: 1,
+      scheduled_date: '2026-10-10'
+    }
+  ];
+
+  const { tasks, warnings } = generateSchedule({
+    monthStart: '2026-10-01',
+    machines: [
+      { id: 'm1', code: 'K1', sort_order: 1, pm_per_month: 2, technician_id: 'tech-1', is_active: true },
+      { id: 'm2', code: 'K2', sort_order: 2, pm_per_month: 1, technician_id: 'tech-1', is_active: true }
+    ],
+    nightsByTech: { 'tech-1': ['2026-10-01', '2026-10-05', '2026-10-10', '2026-10-15'] },
+    fixedTasks,
+    settings: { second_pm_gap_days: '14', second_pm_gap_tolerance_days: '2' }
+  });
+
+  assert.equal(warnings.length, 0);
+  assert.deepEqual(tasks.map(task => ({ machine_id: task.machine_id, sequence: task.sequence, scheduled_date: task.scheduled_date })), [
+    { machine_id: 'm1', sequence: 2, scheduled_date: '2026-10-15' }
+  ]);
+  assert.equal(tasks.some(task => task.scheduled_date === '2026-10-01' || task.scheduled_date === '2026-10-10'), false);
+});

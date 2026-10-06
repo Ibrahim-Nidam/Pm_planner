@@ -55,9 +55,8 @@ async function renderDashboard(profile, serverCtx) {
     if (taskRows) tasks = taskRows;
   }
 
-  // Find PM due tonight
-  const tonightNightDate = serverCtx.night_date;
-  const tonightTask = tasks.find(t => t.scheduled_date === tonightNightDate || (t.latest_allowed_date === tonightNightDate && t.status === 'scheduled'));
+  // Show the next task without restricting execution to its planned date.
+  const nextTask = tasks.find(t => t.status === 'in_progress') || tasks.find(t => t.status === 'scheduled');
 
   // Header Banner & Tonight Card
   let bannerHtml = '';
@@ -68,17 +67,17 @@ async function renderDashboard(profile, serverCtx) {
   let tonightCardHtml = `
     <div class="bg-white p-6 rounded-2xl shadow-sm space-y-3">
       <div class="flex items-center justify-between">
-        <span class="text-xs font-bold uppercase tracking-wider text-slate-400">Tonight Shift (${formatDateDDMMYYYY(tonightNightDate)})</span>
+        <span class="text-xs font-bold uppercase tracking-wider text-slate-400">Next Assigned PM</span>
         ${serverCtx.is_night ? '<span class="px-2 py-0.5 rounded text-xs font-semibold bg-emerald-100 text-emerald-800">Active Night Window (20:30 - 08:30)</span>' : '<span class="px-2 py-0.5 rounded text-xs font-semibold bg-slate-100 text-slate-600">Daytime Window</span>'}
       </div>
-      ${tonightTask ? `
+      ${nextTask ? `
         <div class="flex flex-wrap items-center justify-between gap-4 pt-2">
           <div>
-            <div class="text-xl font-bold text-slate-900 tracking-tight">${tonightTask.machines?.code || 'Machine'} ${tonightTask.sequence === 2 ? '(2P)' : '(PM)'}</div>
-            <p class="text-xs text-slate-500 font-medium mt-0.5">Line: ${tonightTask.machines?.line || 'N/A'}</p>
+            <div class="text-xl font-bold text-slate-900 tracking-tight">${nextTask.machines?.code || 'Machine'} ${nextTask.sequence === 2 ? '(2P)' : '(PM)'}</div>
+            <p class="text-xs text-slate-500 font-medium mt-0.5">Planned: ${formatDateDDMMYYYY(nextTask.scheduled_date)} &bull; Line: ${nextTask.machines?.line || 'N/A'}</p>
           </div>
-          <a href="pm.html?id=${tonightTask.id}" class="px-5 py-3 bg-slate-900 text-white font-semibold text-sm rounded-xl hover:bg-slate-800 transition-all shadow-sm">
-            ${tonightTask.status === 'in_progress' ? 'Continue PM' : 'Open PM Page'}
+          <a href="pm.html?id=${nextTask.id}" class="px-5 py-3 bg-slate-900 text-white font-semibold text-sm rounded-xl hover:bg-slate-800 transition-all shadow-sm">
+            ${nextTask.status === 'in_progress' ? 'Continue PM' : 'Open PM Page'}
           </a>
         </div>
       ` : `
@@ -145,7 +144,6 @@ async function renderDashboard(profile, serverCtx) {
 
   // PM List View
   let taskListRows = tasks.map(t => {
-    const isOverdue = t.status === 'scheduled' && tonightNightDate > t.latest_allowed_date;
     return `
       <a href="pm.html?id=${t.id}" class="block bg-white p-4 rounded-xl shadow-sm hover:shadow-md transition-all">
         <div class="flex items-center justify-between">
@@ -154,8 +152,8 @@ async function renderDashboard(profile, serverCtx) {
             <div class="text-xs text-slate-500 font-medium">Scheduled: ${formatDateDDMMYYYY(t.scheduled_date)}</div>
           </div>
           <div class="flex items-center gap-2">
-            ${t.postponed ? '<span class="px-2 py-0.5 rounded text-xs font-semibold bg-amber-100 text-amber-800">Postponed</span>' : ''}
-            ${renderStatusBadge(t.status, isOverdue)}
+            <span class="px-2 py-0.5 rounded text-xs font-semibold ${t.source === 'manual' ? 'bg-sky-100 text-sky-800' : 'bg-slate-100 text-slate-700'}">${t.source === 'manual' ? 'Manual' : 'Generated'}</span>
+            ${renderStatusBadge(t.status)}
           </div>
         </div>
       </a>

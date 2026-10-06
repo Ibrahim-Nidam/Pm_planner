@@ -45,10 +45,10 @@ Nothing fancy: no reports, charts, notifications or offline mode in v1.
 
 1. **R1.** Machines `K278`–`K290` get **2 PMs/month** (PM and 2P). **All** U units `K887U`–`K933U` get **1 PM/month**; a `0` shown in the paper schedule for one of them is a mistake in the document. `K291` is out of service: **0** and inactive. Stored in `machines.pm_per_month`, editable per machine.
 2. **R2.** A PM is done **only by the technician assigned to the machine**.
-3. **R3.** A PM is done **only during that technician's night shift**, never during the day.
+3. **R3.** A PM may be started whenever the technician is ready after the schedule is approved. The actual start and end timestamps are recorded by the server.
 4. **R4.** Shift cycle is **Day → Night → Rest → Rest**, repeating (4-day cycle). Each technician has an offset (`cycle_anchor_date` + `cycle_anchor_index`; index 0 = day, 1 = night, 2 = rest, 3 = rest). At any date exactly one technician is on day, one on night, two off.
 5. **R5.** 2P target = first PM date + 14 days (setting `second_pm_gap_days`); acceptable range 12–16 days (setting `second_pm_gap_tolerance_days` = 2). Both PMs must fall in the same month.
-6. **R6 (tolerance).** Exceptional postponement: if the technician has **two night shifts in the same week (Monday–Sunday)**, he may do the PM on the second night instead of the first. Never further. Extreme cases only, so a **reason is mandatory**, and the lead can see which PMs were postponed.
+6. **R6.** The planned date remains part of the schedule, but it does not restrict when an approved PM may be started.
 7. **R7.** The night shift runs **20:30 → 08:30**. A PM is dated by its **night date**: the date the night shift **starts**. The night that begins at 20:30 on 12/10 is "the night of 12/10", including the hours after midnight on 13/10 up to 08:30.
 8. **R8.** Only **one technician is on night at any time**, and he does **at most 1 PM per night**. So across the whole fleet there is **at most 1 PM per night**. This is a hard rule, not a preference. (Consequence: two machines on the same line number in different locations can never be serviced the same night.)
 
@@ -179,7 +179,7 @@ Created manually (see `docs/SETUP_SUPABASE.md`). The UI creates technicians only
 Draft rows in `pm_tasks`, and a `schedule_months` row with `status = 'draft'`.
 
 ### Algorithm (`js/scheduler.js`, pure function, no DOM, no network)
-Signature: `generateSchedule({ monthStart, machines, nightsByTech, settings }) → { tasks, warnings }`.
+Signature: `generateSchedule({ monthStart, machines, nightsByTech, fixedTasks, settings }) → { tasks, warnings }`.
 
 For each technician independently (sorted by name):
 1. Build the list of PM items: 2 items (sequence 1 and 2) for each 2-PM machine, 1 item for each 1-PM machine.
@@ -196,8 +196,8 @@ Deterministic: same inputs → same output.
 Warnings (shown in the lead UI): machine without technician, inactive technician, not enough free nights (unplaced PM), 2P outside 12–16 days. Inactive machines (e.g. `K291`) are skipped silently.
 
 ### Lead workflow
-1. Open `lead/schedule.html`, pick a month, press **Generate** (creates or replaces the **draft** only).
-2. Review the grid. Click a PM cell → drawer → change its date. Allowed dates = **only that technician's night dates** of the month (R2, R3). Changing a date recomputes `latest_allowed_date`. Logged in `audit_log` (`task.move`).
+1. Open `lead/schedule.html`, pick a month, add any manual PMs, then press **Generate**. Manual PMs remain fixed; generated PMs fill the remaining machine slots and dates in the draft.
+2. Review the grid. Click a PM cell → drawer → change its planned date. Manual and generated tasks are labeled separately, and task creation records the lead who created the row.
 3. Press **Approve** → `status = 'approved'`, `approved_by`, `approved_at`. Technicians see their PMs from this moment.
 4. After approval the lead may still move tasks with status `scheduled` (logged). Generate is disabled on approved months. Tasks `in_progress` or `completed` can never be moved or deleted.
 
@@ -206,11 +206,11 @@ Warnings (shown in the lead UI): machine without technician, inactive technician
 ## 9. PM execution (technician)
 
 ### Time source
-All checks use **server time**. The browser calls RPC `get_server_context()` on load and every 60 s to know `now`, `night_date`, `is_night`. Never trust `new Date()` for permission logic.
+Execution timestamps use **server time**. The browser may display server context, but start permission does not depend on the planned date, night window, or device time.
 
 ### Start button
-Enabled only if **all** are true: task `status = 'scheduled'`, month approved, `is_night = true` (20:30–08:30), and `night_date = scheduled_date` — or `night_date = latest_allowed_date` (> scheduled) in which case the UI first asks for a **mandatory postpone reason**. RPC `start_pm(task_id, reason)` re-validates everything and sets `started_at = now()`. Only one PM in progress per technician at a time.
-When disabled, show a short reason under the button ("Available on 12/10/2026 from 20:30").
+Enabled only if **all** are true: task `status = 'scheduled'`, month approved, and the technician owns the task. RPC `start_pm(task_id)` re-validates everything and sets `started_at = now()`. Only one PM in progress per technician at a time.
+When disabled, show a short reason under the button (for example, when the schedule is not published yet).
 
 ### During the PM
 - Textarea **"Notes / changes made"**, saved with `save_pm_notes` (debounced, ~1.5 s) while `in_progress`.

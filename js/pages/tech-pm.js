@@ -88,33 +88,13 @@ async function renderTaskDetails(profile, serverCtx) {
   const isTechnician = profile.role === 'technician';
   const isOwner = task.technician_id === profile.id;
   const isApproved = task.schedule_months?.status === 'approved';
-  const tonightNightDate = serverCtx.night_date;
-
-  const { data: armedSetting } = await supabase
-    .from('app_settings')
-    .select('value')
-    .eq('key', 'pm_start_armed')
-    .maybeSingle();
-
   // Validation flags for Start Button
-  const isNightTime = serverCtx.is_night;
-  const isScheduledNight = tonightNightDate === task.scheduled_date;
-  const isArmed = armedSetting
-    ? armedSetting.value !== 'false'
-    : task.is_armed !== false && task.schedule_months?.pm_start_armed !== false;
-  const isToleranceNight = isArmed && tonightNightDate === task.latest_allowed_date && task.latest_allowed_date > task.scheduled_date;
-  const canStartNight = !isArmed || isScheduledNight || isToleranceNight;
-  
-  const isOverdue = isArmed && task.status === 'scheduled' && tonightNightDate > task.latest_allowed_date;
-  const canStart = isTechnician && isOwner && isApproved && task.status === 'scheduled' && isNightTime && canStartNight;
+  const canStart = isTechnician && isOwner && isApproved && task.status === 'scheduled';
 
   // Start disabled reason string
   let startDisabledReason = '';
   if (!isApproved) startDisabledReason = 'Schedule is not published yet.';
   else if (task.status !== 'scheduled') startDisabledReason = `Task is ${task.status}.`;
-  else if (isOverdue) startDisabledReason = 'This task is overdue and requires lead re-planning.';
-  else if (!isNightTime) startDisabledReason = 'Available during the night shift (20:30 - 08:30).';
-  else if (!canStartNight) startDisabledReason = `Scheduled for night of ${formatDateDDMMYYYY(task.scheduled_date)}.`;
 
   let photosHtml = photoUrls.map((p, idx) => `
     <div class="relative group rounded-xl overflow-hidden bg-slate-100 aspect-square shadow-sm cursor-pointer border border-slate-200 hover:border-slate-400 transition-all">
@@ -144,7 +124,7 @@ async function renderTaskDetails(profile, serverCtx) {
           <p class="text-xs font-semibold uppercase tracking-wider text-slate-400 mt-0.5">Line ${task.machines?.line || 'N/A'} &bull; ${task.machines?.location === 'terminal_1' ? 'Terminal 1' : 'Transit'}</p>
         </div>
         <div>
-          ${renderStatusBadge(task.status, isOverdue)}
+          ${renderStatusBadge(task.status)}
         </div>
       </div>
 
@@ -170,13 +150,6 @@ async function renderTaskDetails(profile, serverCtx) {
       <!-- Execution Status Section -->
       ${task.status === 'scheduled' ? `
         <div class="space-y-3 pt-2">
-          ${isToleranceNight ? `
-            <div class="space-y-2">
-              <label for="postpone-reason" class="block text-xs font-semibold uppercase text-slate-600">Mandatory Postpone Reason</label>
-              <textarea id="postpone-reason" rows="2" placeholder="Required because performing PM on tolerance night..." class="w-full p-3 bg-slate-100 text-slate-900 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-slate-900"></textarea>
-            </div>
-          ` : ''}
-
           <button id="start-pm-btn" ${!canStart ? 'disabled' : ''} class="w-full py-4 bg-slate-900 text-white font-bold rounded-xl text-base shadow-sm hover:bg-slate-800 transition-all disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed">
             Start PM
           </button>
@@ -249,21 +222,12 @@ async function renderTaskDetails(profile, serverCtx) {
   const startBtn = document.getElementById('start-pm-btn');
   if (startBtn && canStart) {
     startBtn.addEventListener('click', async () => {
-      let postponeReason = null;
-      if (isToleranceNight) {
-        postponeReason = document.getElementById('postpone-reason')?.value;
-        if (!postponeReason || !postponeReason.trim()) {
-          showToast("A postpone reason is required.", "error");
-          return;
-        }
-      }
-
       try {
         startBtn.disabled = true;
         startBtn.textContent = "Starting...";
         const { error: rpcErr } = await supabase.rpc('start_pm', {
           p_task_id: task.id,
-          p_postpone_reason: postponeReason
+          p_postpone_reason: null
         });
         if (rpcErr) throw rpcErr;
         showToast("PM started successfully", "success");

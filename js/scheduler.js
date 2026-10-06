@@ -86,7 +86,7 @@ export function toleranceDate(scheduledDateStr, techNights) {
  * Pure scheduling function.
  * SPECS §8 Algorithm with mid-month generation & cross-month gap support.
  */
-export function generateSchedule({ monthStart, machines, nightsByTech, previousPmDates = {}, minDate = null, settings = {} }) {
+export function generateSchedule({ monthStart, machines, nightsByTech, previousPmDates = {}, minDate = null, settings = {}, fixedTasks = [] }) {
   const gap = parseInt(settings.second_pm_gap_days || '14', 10);
   const tol = parseInt(settings.second_pm_gap_tolerance_days || '2', 10);
   const minGap = gap - tol;
@@ -94,7 +94,13 @@ export function generateSchedule({ monthStart, machines, nightsByTech, previousP
 
   const tasks = [];
   const warnings = [];
-  const usedNightsGlobal = new Set();
+  const usedNightsGlobal = new Set(fixedTasks.map(task => task.scheduled_date));
+  const fixedByMachine = new Map();
+
+  for (const task of fixedTasks) {
+    if (!fixedByMachine.has(task.machine_id)) fixedByMachine.set(task.machine_id, new Map());
+    fixedByMachine.get(task.machine_id).set(task.sequence, task);
+  }
 
   // Group machines by technician
   const activeMachines = machines.filter(m => m.is_active && m.pm_per_month > 0);
@@ -128,8 +134,10 @@ export function generateSchedule({ monthStart, machines, nightsByTech, previousP
       continue;
     }
 
-    let freeNights = [...techNights];
-    const placedDates = [];
+    let freeNights = techNights.filter(night => !usedNightsGlobal.has(night));
+    const placedDates = fixedTasks
+      .filter(task => task.technician_id === techId)
+      .map(task => task.scheduled_date);
 
     // Separate 2-PM and 1-PM machines, sort by sort_order
     const machines2PM = techMachines.filter(m => m.pm_per_month === 2).sort((a, b) => a.sort_order - b.sort_order);
@@ -137,6 +145,52 @@ export function generateSchedule({ monthStart, machines, nightsByTech, previousP
 
     // Place 2-PM machines first
     for (const m of machines2PM) {
+      const fixedMachineTasks = fixedByMachine.get(m.id) || new Map();
+      const fixedFirst = fixedMachineTasks.get(1);
+      const fixedSecond = fixedMachineTasks.get(2);
+
+      if (fixedFirst && fixedSecond) continue;
+
+      if (fixedFirst || fixedSecond) {
+        const fixedTask = fixedFirst || fixedSecond;
+        const missingSequence = fixedFirst ? 2 : 1;
+        const candidates = freeNights.filter(night => {
+          const diff = Math.round((new Date(night).getTime() - new Date(fixedTask.scheduled_date).getTime()) / (1000 * 60 * 60 * 24));
+          return fixedFirst ? diff > 0 : diff < 0;
+        });
+        const preferredCandidates = candidates.filter(night => {
+          const diff = Math.abs(Math.round((new Date(night).getTime() - new Date(fixedTask.scheduled_date).getTime()) / (1000 * 60 * 60 * 24)));
+          return diff >= minGap && diff <= maxGap;
+        });
+        const candidatePool = preferredCandidates.length > 0 ? preferredCandidates : candidates;
+        const bestNight = candidatePool.sort((a, b) => {
+          const aDiff = Math.abs(Math.round((new Date(a).getTime() - new Date(fixedTask.scheduled_date).getTime()) / (1000 * 60 * 60 * 24)));
+          const bDiff = Math.abs(Math.round((new Date(b).getTime() - new Date(fixedTask.scheduled_date).getTime()) / (1000 * 60 * 60 * 24)));
+          return Math.abs(aDiff - gap) - Math.abs(bDiff - gap);
+        })[0];
+
+        if (bestNight) {
+          const diff = Math.abs(Math.round((new Date(bestNight).getTime() - new Date(fixedTask.scheduled_date).getTime()) / (1000 * 60 * 60 * 24)));
+          if (diff < minGap || diff > maxGap) {
+            warnings.push(`2P gap for machine ${m.code} is outside ${minGap}-${maxGap} days range.`);
+          }
+          freeNights = freeNights.filter(night => night !== bestNight);
+          placedDates.push(bestNight);
+          usedNightsGlobal.add(bestNight);
+          tasks.push({
+            machine_id: m.id,
+            machine_code: m.code,
+            technician_id: techId,
+            sequence: missingSequence,
+            scheduled_date: bestNight,
+            latest_allowed_date: toleranceDate(bestNight, techNights)
+          });
+        } else {
+          warnings.push(`Could not place missing 2 PM for machine ${m.code} around its manual PM.`);
+        }
+        continue;
+      }
+
       let bestPair = null;
       let bestCost = Infinity;
       const prevPmDate = previousPmDates[m.id];
@@ -235,6 +289,8 @@ export function generateSchedule({ monthStart, machines, nightsByTech, previousP
 
     // Place 1-PM machines
     for (const m of machines1PM) {
+      if ((fixedByMachine.get(m.id) || new Map()).has(1)) continue;
+
       if (freeNights.length === 0) {
         warnings.push(`Could not place PM for machine ${m.code} (no free nights remaining).`);
         continue;

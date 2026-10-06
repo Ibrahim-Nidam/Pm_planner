@@ -30,13 +30,6 @@ async function renderPage(profile) {
       .eq('month', currentMonthStr)
       .maybeSingle();
 
-    const { data: armedSetting, error: armedSettingError } = await supabase
-      .from('app_settings')
-      .select('value')
-      .eq('key', 'pm_start_armed')
-      .maybeSingle();
-    if (armedSettingError) throw armedSettingError;
-
     const status = monthRow ? monthRow.status : 'draft';
 
     // 2. Fetch machines
@@ -61,10 +54,6 @@ async function renderPage(profile) {
         .eq('month_id', monthRow.id);
       if (taskRows) tasks = taskRows;
     }
-
-    const pmStartArmed = armedSetting
-      ? armedSetting.value !== 'false'
-      : tasks.every(task => task.is_armed !== false);
 
     // 5. Fetch shifts for the month
     const [year, monthNum] = currentMonthStr.split('-').map(Number);
@@ -112,10 +101,10 @@ async function renderPage(profile) {
         if (matchingTask) {
           const is2P = matchingTask.sequence === 2;
           const label = is2P ? '2P' : 'PM';
-          const bg = matchingTask.status === 'completed' ? 'bg-emerald-600 text-white' : matchingTask.status === 'in_progress' ? 'bg-amber-500 text-white' : 'bg-slate-900 text-white';
+          const bg = matchingTask.status === 'completed' ? 'bg-emerald-600 text-white' : matchingTask.status === 'in_progress' ? 'bg-amber-500 text-white' : matchingTask.source === 'manual' ? 'bg-sky-700 text-white' : 'bg-slate-900 text-white';
           return `
             <td class="p-1 text-center align-middle grid-cell min-w-[36px] w-[36px]" data-row-id="m-${m.id}" data-machine-id="${m.id}" data-date="${dateStr}">
-              <button data-task-id="${matchingTask.id}" class="task-pill w-full h-[20px] text-[9px] font-bold rounded ${bg} shadow-xs hover:opacity-90 cursor-pointer transition-all">
+              <button data-task-id="${matchingTask.id}" title="${matchingTask.source === 'manual' ? 'Manual PM' : 'Generated PM'}" class="task-pill w-full h-[20px] text-[9px] font-bold rounded ${bg} shadow-xs hover:opacity-90 cursor-pointer transition-all">
                 ${label}
               </button>
             </td>
@@ -175,10 +164,6 @@ async function renderPage(profile) {
             ${renderStatusBadge(status)}
           </div>
           <div class="flex items-center gap-2 flex-wrap">
-            <label class="inline-flex items-center gap-2 px-3 py-2.5 bg-slate-50 rounded-xl text-xs font-semibold text-slate-700 cursor-pointer min-h-[44px]">
-              <input id="armed-toggle" type="checkbox" class="w-5 h-5 accent-emerald-600" ${pmStartArmed ? 'checked' : ''}>
-              <span>Armed start rule</span>
-            </label>
             <button id="add-pm-btn" class="px-4 py-2.5 bg-slate-800 text-white font-semibold text-xs sm:text-sm rounded-xl hover:bg-slate-700 transition-all shadow-sm cursor-pointer flex items-center gap-1.5">
               <span>+</span> Add PM Task
             </button>
@@ -305,36 +290,6 @@ async function renderPage(profile) {
       await renderPage(profile);
     });
 
-    const armedToggle = document.getElementById('armed-toggle');
-    if (armedToggle) {
-      armedToggle.addEventListener('change', async () => {
-        const requestedValue = armedToggle.checked;
-        armedToggle.disabled = true;
-        try {
-          const { data: savedSetting, error: updateErr } = await supabase
-            .from('app_settings')
-            .upsert({ key: 'pm_start_armed', value: String(requestedValue) }, { onConflict: 'key' })
-            .select('value')
-            .single();
-
-          if (updateErr) throw updateErr;
-          const { error: taskUpdateError } = await supabase
-            .from('pm_tasks')
-            .update({ is_armed: requestedValue, updated_at: new Date().toISOString() })
-            .eq('status', 'scheduled');
-
-          if (taskUpdateError) throw taskUpdateError;
-          armedToggle.checked = savedSetting.value === 'true';
-          showToast(armedToggle.checked ? 'PM start rule armed globally' : 'PMs unlocked globally for off-schedule starts', 'success');
-        } catch (err) {
-          armedToggle.checked = !requestedValue;
-          showToast(`Arming update failed: ${err.message}`, 'error');
-        } finally {
-          armedToggle.disabled = false;
-        }
-      });
-    }
-
     // Attach Task Pill Click Handler
     app.querySelectorAll('.task-pill').forEach(btn => {
       btn.addEventListener('click', async (e) => {
@@ -457,7 +412,9 @@ async function renderPage(profile) {
               sequence: sequence,
               scheduled_date: schedDate,
               latest_allowed_date: schedDate,
-              status: 'scheduled'
+              status: 'scheduled',
+              source: 'manual',
+              created_by: profile.id
             });
 
           if (insErr) throw insErr;
@@ -478,7 +435,7 @@ async function renderPage(profile) {
     // Generate Button Handler
     document.getElementById('generate-btn').addEventListener('click', async () => {
       if (status === 'approved') return;
-      if (!await confirmAction('Generate the monthly PM schedule? Existing un-started tasks for this month will be replaced.', { title: 'Generate schedule', confirmLabel: 'Generate schedule' })) return;
+      if (!await confirmAction('Generate the monthly PM schedule? Manual PMs will be preserved and used as fixed entries.', { title: 'Generate schedule', confirmLabel: 'Generate schedule' })) return;
 
       try {
         showToast("Generating schedule...", "info");
@@ -561,12 +518,13 @@ async function renderPage(profile) {
           nightsByTech,
           previousPmDates,
           minDate,
+          fixedTasks: tasks.filter(task => task.status === 'scheduled' && task.source === 'manual'),
           settings: { second_pm_gap_days: '14', second_pm_gap_tolerance_days: '2' }
         });
 
         activeWarnings = warnings;
 
-        await supabase.from('pm_tasks').delete().eq('month_id', monthRow.id).eq('status', 'scheduled');
+        await supabase.from('pm_tasks').delete().eq('month_id', monthRow.id).eq('status', 'scheduled').eq('source', 'generated');
 
         const insertRows = generatedTasks.map(gt => ({
           month_id: monthRow.id,
@@ -575,7 +533,9 @@ async function renderPage(profile) {
           sequence: gt.sequence,
           scheduled_date: gt.scheduled_date,
           latest_allowed_date: gt.latest_allowed_date,
-          status: 'scheduled'
+          status: 'scheduled',
+          source: 'generated',
+          created_by: profile.id
         }));
 
         if (insertRows.length > 0) {
@@ -708,6 +668,12 @@ async function openDrawer(task, profile, technicians, shiftRows, monthRow) {
       <div class="space-y-1">
         <span class="text-slate-400 block text-[10px] uppercase font-bold">Execution Status</span>
         <div>${renderStatusBadge(task.status)}</div>
+      </div>
+
+      <div class="space-y-1">
+        <span class="text-slate-400 block text-[10px] uppercase font-bold">Task Origin</span>
+        <span class="inline-flex px-2 py-1 rounded text-xs font-bold ${task.source === 'manual' ? 'bg-sky-100 text-sky-800' : 'bg-slate-100 text-slate-700'}">${task.source === 'manual' ? 'Manual PM' : 'Generated PM'}</span>
+        <span class="block text-[11px] text-slate-500">Created by ${task.created_by === profile.id ? profile.full_name : 'another team lead'}</span>
       </div>
 
       ${task.notes ? `
