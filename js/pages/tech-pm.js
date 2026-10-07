@@ -3,8 +3,17 @@ import { requireRole } from '../guard.js';
 import { supabase } from '../supabase-client.js';
 import { fetchServerContext, initServerTimeSync, formatDateDDMMYYYY, formatTime24h, formatDurationMinutes } from '../time.js';
 import { renderTopBar, renderStatusBadge, showToast, openPhotoLightbox, confirmAction } from '../ui.js';
+import { downloadPmDocuments, printPmDocument, printChecklist } from '../pm-documents.js';
 
 let taskId = new URLSearchParams(window.location.search).get('id');
+
+function escapeAttribute(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
 
 async function init() {
   const guard = await requireRole('any');
@@ -65,6 +74,11 @@ async function renderTaskDetails(profile, serverCtx) {
     app.innerHTML = `<div class="p-6 bg-white rounded-2xl text-rose-600 font-semibold">Error loading task: ${error?.message || 'Task not found'}</div>`;
     return;
   }
+  const { data: technician } = await supabase
+    .from('profiles')
+    .select('full_name')
+    .eq('id', task.technician_id)
+    .maybeSingle();
 
   // Fetch photos
   const { data: photos } = await supabase
@@ -174,12 +188,26 @@ async function renderTaskDetails(profile, serverCtx) {
           </div>
         </div>
 
-        <!-- Notes Section -->
+        <!-- Parts Section -->
         <div class="space-y-2">
-          <label for="pm-notes" class="block text-xs font-semibold uppercase text-slate-500">Notes & Changes Made</label>
-          <textarea id="pm-notes" rows="4" ${task.status === 'completed' || !isOwner ? 'readonly' : ''} placeholder="Describe PM tasks completed..." class="w-full p-4 bg-slate-100 text-slate-900 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-slate-900">${task.notes || ''}</textarea>
-          ${task.status === 'in_progress' ? '<span id="notes-status" class="text-[10px] text-slate-400 font-medium block text-right">Auto-saved</span>' : ''}
+          <div class="flex items-center justify-between">
+            <label class="block text-xs font-semibold uppercase text-slate-500">Parts used</label>
+            ${task.status === 'in_progress' && isOwner ? '<button id="add-part-btn" type="button" class="px-3 py-2 bg-slate-900 text-white rounded-lg text-xs font-bold">Add</button>' : ''}
+          </div>
+          <div id="parts-list" class="space-y-3"></div>
+          <span id="parts-status" class="text-[10px] text-slate-400 font-medium block text-right">${task.status === 'in_progress' && isOwner ? 'Auto-saved' : ''}</span>
         </div>
+        <div class="space-y-2">
+          <label for="pm-notes" class="block text-xs font-semibold uppercase text-slate-500">Notes</label>
+          <textarea id="pm-notes" rows="3" ${task.status === 'completed' || !isOwner ? 'readonly' : ''} placeholder="Additional note..." class="w-full p-4 bg-slate-100 text-slate-900 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-slate-900">${task.notes || ''}</textarea>
+        </div>
+        ${task.status === 'completed' ? `
+          <div class="flex flex-wrap gap-2 pt-2">
+            <button id="download-docs-btn" class="px-4 py-3 bg-slate-900 text-white rounded-xl text-sm font-bold">Download documents</button>
+            <button id="print-doc-btn" class="px-4 py-3 bg-white text-slate-900 rounded-xl text-sm font-bold shadow-sm">Print PM document</button>
+            <button id="print-checklist-btn" class="px-4 py-3 bg-white text-slate-900 rounded-xl text-sm font-bold shadow-sm">Print checklist</button>
+          </div>
+        ` : ''}
 
         <!-- Photos Section -->
         <div class="space-y-3 pt-2">
@@ -209,6 +237,37 @@ async function renderTaskDetails(profile, serverCtx) {
       ` : ''}
     </div>
   `;
+
+  const initialParts = Array.isArray(task.parts) && task.parts.length ? task.parts : [{}];
+  const partsList = document.getElementById('parts-list');
+  const renderParts = (parts) => {
+    if (!partsList) return;
+    partsList.innerHTML = parts.map((part, index) => `
+      <div class="part-row grid grid-cols-1 sm:grid-cols-3 gap-2" data-index="${index}">
+        <input data-part="designation" value="${escapeAttribute(part.designation)}" placeholder="Designation" ${task.status === 'completed' || !isOwner ? 'readonly' : ''} class="part-input w-full p-3 bg-slate-100 rounded-xl text-sm">
+        <input data-part="reference" value="${escapeAttribute(part.reference)}" placeholder="Reference" ${task.status === 'completed' || !isOwner ? 'readonly' : ''} class="part-input w-full p-3 bg-slate-100 rounded-xl text-sm">
+        <input data-part="quantity" value="${escapeAttribute(part.quantity)}" placeholder="Quantity" ${task.status === 'completed' || !isOwner ? 'readonly' : ''} class="part-input w-full p-3 bg-slate-100 rounded-xl text-sm">
+      </div>
+    `).join('');
+  };
+  renderParts(initialParts);
+
+  const collectParts = () => [...document.querySelectorAll('.part-row')].map(row => ({
+    designation: row.querySelector('[data-part="designation"]').value.trim(),
+    reference: row.querySelector('[data-part="reference"]').value.trim(),
+    quantity: row.querySelector('[data-part="quantity"]').value.trim()
+  })).filter(part => part.designation || part.reference || part.quantity);
+
+  document.getElementById('add-part-btn')?.addEventListener('click', () => {
+    const parts = [...document.querySelectorAll('.part-row')].map(row => ({
+      designation: row.querySelector('[data-part="designation"]').value,
+      reference: row.querySelector('[data-part="reference"]').value,
+      quantity: row.querySelector('[data-part="quantity"]').value
+    }));
+    parts.push({});
+    renderParts(parts);
+    partsList.lastElementChild?.querySelector('input')?.focus();
+  });
 
   // Attach Lightbox triggers
   app.querySelectorAll('.lightbox-trigger').forEach(img => {
@@ -240,7 +299,7 @@ async function renderTaskDetails(profile, serverCtx) {
     });
   }
 
-  // Debounced notes auto-saver
+  // Debounced notes and parts auto-saver
   const notesTextarea = document.getElementById('pm-notes');
   if (notesTextarea && task.status === 'in_progress' && isOwner) {
     let saveTimeout = null;
@@ -250,15 +309,34 @@ async function renderTaskDetails(profile, serverCtx) {
       clearTimeout(saveTimeout);
       saveTimeout = setTimeout(async () => {
         try {
-          await supabase.rpc('save_pm_notes', {
+          const { error: notesError } = await supabase.rpc('save_pm_notes', {
             p_task_id: task.id,
             p_notes: notesTextarea.value
           });
+          if (notesError) throw notesError;
           if (statusEl) statusEl.textContent = 'Saved';
         } catch (e) {
           if (statusEl) statusEl.textContent = 'Save error';
         }
       }, 1500);
+    });
+    const saveParts = async () => {
+      const statusEl = document.getElementById('parts-status');
+      if (statusEl) statusEl.textContent = 'Saving...';
+      const { error: partsError } = await supabase.rpc('save_pm_parts', {
+        p_task_id: task.id,
+        p_parts: collectParts()
+      });
+      if (partsError) throw partsError;
+      if (statusEl) statusEl.textContent = 'Saved';
+    };
+    let partsSaveTimeout;
+    partsList?.addEventListener('input', () => {
+      clearTimeout(partsSaveTimeout);
+      partsSaveTimeout = setTimeout(() => saveParts().catch(() => {
+        const statusEl = document.getElementById('parts-status');
+        if (statusEl) statusEl.textContent = 'Save error';
+      }), 700);
     });
   }
 
@@ -338,9 +416,11 @@ async function renderTaskDetails(profile, serverCtx) {
         endBtn.disabled = true;
         endBtn.textContent = "Ending...";
         const finalNotes = document.getElementById('pm-notes')?.value;
+        const finalParts = collectParts();
         const { error: rpcErr } = await supabase.rpc('end_pm', {
           p_task_id: task.id,
-          p_notes: finalNotes
+          p_notes: finalNotes,
+          p_parts: finalParts
         });
         if (rpcErr) throw rpcErr;
         showToast("PM completed successfully", "success");
@@ -352,6 +432,26 @@ async function renderTaskDetails(profile, serverCtx) {
       }
     });
   }
+
+  document.getElementById('download-docs-btn')?.addEventListener('click', async (event) => {
+    event.currentTarget.disabled = true;
+    try {
+      await downloadPmDocuments(task, technician?.full_name);
+      showToast('Documents downloaded', 'success');
+    } catch (err) {
+      showToast(err.message || 'Could not generate documents', 'error');
+    } finally {
+      event.currentTarget.disabled = false;
+    }
+  });
+  document.getElementById('print-doc-btn')?.addEventListener('click', () => {
+    printPmDocument(task, technician?.full_name)
+      .catch(err => showToast(err.message || 'Could not print document', 'error'));
+  });
+  document.getElementById('print-checklist-btn')?.addEventListener('click', () => {
+    try { printChecklist(task, technician?.full_name); }
+    catch (err) { showToast(err.message || 'Could not print checklist', 'error'); }
+  });
 }
 
 init();

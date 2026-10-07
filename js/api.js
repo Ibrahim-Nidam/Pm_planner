@@ -26,10 +26,20 @@ export async function savePmNotes(taskId, notes) {
   return data;
 }
 
-export async function endPm(taskId, notes = null) {
+export async function endPm(taskId, notes = null, parts = []) {
   const { data, error } = await supabase.rpc('end_pm', {
     p_task_id: taskId,
-    p_notes: notes
+    p_notes: notes,
+    p_parts: parts
+  });
+  if (error) throw error;
+  return data;
+}
+
+export async function savePmParts(taskId, parts) {
+  const { data, error } = await supabase.rpc('save_pm_parts', {
+    p_task_id: taskId,
+    p_parts: parts
   });
   if (error) throw error;
   return data;
