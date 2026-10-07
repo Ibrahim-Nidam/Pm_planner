@@ -42,4 +42,12 @@ Update after every change. Status: `stub` / `done` / `tested`.
 | tech/dashboard.html | done |
 | tech/pm.html | done |
 | tests/scheduler.test.mjs | tested |
+| tests/pm-documents.test.mjs | tested |
 | docs/FILE_TRACKER.md | done |
+| js/pm-documents.js | done |
+| supabase/migrations/017_pm_parts.sql | written |
+| docs/PM template.docx | converted fillable copy of PM template.doc |
+| docs/PM template.html | generated from supplied template |
+| docs/PM template_html_3d5960e3.png | generated template asset |
+| docs/PM template_html_e4ea908a.gif | generated template asset |
+| docs/PM template_html_e882d356.png | generated template asset |

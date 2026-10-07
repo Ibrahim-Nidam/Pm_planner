@@ -254,8 +254,16 @@ function fileStamp(data) {
 export async function downloadPmDocuments(task, technicianName) {
   const data = documentData(task, technicianName);
   await downloadBlob(await patchWordDocument(data), `PM-${fileStamp(data)}.docx`);
+  await new Promise(resolve => setTimeout(resolve, 400));
   await downloadBlob(await patchChecklist(data), `Checklist-PM-${fileStamp(data)}.xlsx`);
 }
+
+export {
+  documentData,
+  fillWordXml,
+  fillChecklistXml,
+  maintenanceCycle
+};
 
 function normalise(value) {
   return String(value || '').replace(/\s+/g, ' ').trim().toLowerCase();
