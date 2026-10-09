@@ -38,9 +38,9 @@ test('document fields use full technician name, week number, and cycle', () => {
 test('maintenance cycle follows 2-1-2-1 months from January 2026', () => {
   assert.equal(maintenanceCycle('2026-01-15'), 'mensuel');
   assert.equal(maintenanceCycle('2026-02-15'), 'mensuel');
-  assert.equal(maintenanceCycle('2026-03-15'), 'trimestriel');
+  assert.equal(maintenanceCycle('2026-03-15'), 'trimestrielle');
   assert.equal(maintenanceCycle('2026-06-15'), 'semi annuel');
-  assert.equal(maintenanceCycle('2026-09-15'), 'trimestriel');
+  assert.equal(maintenanceCycle('2026-09-15'), 'trimestrielle');
   assert.equal(maintenanceCycle('2026-12-15'), 'annuel');
 });
 
@@ -68,8 +68,28 @@ test('Excel checklist appends values after the original labels', () => {
   const filled = fillChecklistXml(xml, documentData(task, 'Ahmed Benali'));
   assert.match(filled, /Numéro de série du CTX : K279/);
   assert.match(filled, /Adresse du CTX : L5/);
+  assert.match(filled, /Période de MP :  mensuel/);
   assert.match(filled, /Nom du ou des techniciens de maintenance : Ahmed Benali/);
   assert.match(filled, /Date de début de la MP : 07\/10\/2026 21:05/);
   assert.match(filled, /Date de fin de la MP : 07\/10\/2026 23:40/);
   assert.doesNotMatch(filled, /Date de fin de la MP : <\/t>/);
+});
+
+test('Excel checklist marks period-specific tasks as non-applicable', async () => {
+  const { fillChecklistSheetXml } = await import('../js/pm-documents.js');
+  const sheetXml = zipText('docs/Cheklist_PM.xlsx', 'xl/worksheets/sheet1.xml');
+  const monthly = fillChecklistSheetXml(sheetXml, documentData(task, 'Ahmed Benali'));
+  assert.match(monthly, /r="C53"[^>]*t="inlineStr"><is><t>NON<\/t>/);
+  assert.match(monthly, /r="C55"[^>]*t="inlineStr"><is><t>NON<\/t>/);
+  assert.match(monthly, /r="C84"[^>]*t="inlineStr"><is><t>NON<\/t>/);
+
+  const quarterlyTask = { ...task, scheduled_date: '2026-03-07' };
+  const quarterly = fillChecklistSheetXml(sheetXml, documentData(quarterlyTask, 'Ahmed Benali'));
+  assert.match(quarterly, /r="C53"[^>]*t="inlineStr"><is><t>OUI<\/t>/);
+  assert.match(quarterly, /r="C55"[^>]*t="inlineStr"><is><t>NON<\/t>/);
+
+  const semiAnnualTask = { ...task, scheduled_date: '2026-06-07' };
+  const semiAnnual = fillChecklistSheetXml(sheetXml, documentData(semiAnnualTask, 'Ahmed Benali'));
+  assert.match(semiAnnual, /r="C53"[^>]*t="inlineStr"><is><t>OUI<\/t>/);
+  assert.match(semiAnnual, /r="C55"[^>]*t="inlineStr"><is><t>OUI<\/t>/);
 });

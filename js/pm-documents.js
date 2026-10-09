@@ -78,10 +78,25 @@ function duration(start, end) {
 function maintenanceCycle(dateValue) {
   const date = parseDate(dateValue) || new Date();
   const index = (((date.getFullYear() - 2026) * 12 + date.getMonth()) % 12 + 12) % 12;
-  if (index === 2 || index === 8) return 'trimestriel';
+  if (index === 2 || index === 8) return 'trimestrielle';
   if (index === 5) return 'semi annuel';
   if (index === 11) return 'annuel';
   return 'mensuel';
+}
+
+const CHECKLIST_PERIOD_ROWS = {
+  quarterlyOrLonger: [53, 58, 84, 85, 87, 88],
+  semiAnnualOrAnnual: [55]
+};
+
+function periodAllowsTask(period, row) {
+  if (CHECKLIST_PERIOD_ROWS.quarterlyOrLonger.includes(row)) {
+    return period !== 'mensuel';
+  }
+  if (CHECKLIST_PERIOD_ROWS.semiAnnualOrAnnual.includes(row)) {
+    return period === 'semi annuel' || period === 'annuel';
+  }
+  return true;
 }
 
 function normaliseParts(parts) {
@@ -203,17 +218,30 @@ function fillWordXml(xml, data) {
 
 function appendChecklistLabel(xml, label, value) {
   const escapedLabel = label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const pattern = new RegExp(`(<t[^>]*>)${escapedLabel}[^<]*(</t>)`);
+  const pattern = new RegExp(`(<t[^>]*>[^<]*${escapedLabel})[^<]*(</t>)`);
   if (!pattern.test(xml)) throw new Error(`Checklist field not found: ${label}`);
-  return xml.replace(pattern, `$1${label}${escapeXml(value)}$2`);
+  return xml.replace(pattern, `$1${escapeXml(value)}$2`);
 }
 
 function fillChecklistXml(xml, data) {
   xml = appendChecklistLabel(xml, 'Numéro de série du CTX : ', data.machine);
   xml = appendChecklistLabel(xml, 'Adresse du CTX : ', data.line);
+  xml = appendChecklistLabel(xml, 'Période de MP :  ', data.cycle);
   xml = appendChecklistLabel(xml, 'Nom du ou des techniciens de maintenance : ', data.technician);
   xml = appendChecklistLabel(xml, 'Date de début de la MP : ', data.startedAt);
   xml = appendChecklistLabel(xml, 'Date de fin de la MP : ', data.endedAt);
+  return xml;
+}
+
+function fillChecklistSheetXml(xml, data) {
+  for (const row of [...CHECKLIST_PERIOD_ROWS.quarterlyOrLonger, ...CHECKLIST_PERIOD_ROWS.semiAnnualOrAnnual]) {
+    const answer = periodAllowsTask(data.cycle, row) ? 'OUI' : 'NON';
+    const pattern = new RegExp(`<c([^>]*\\br="${`C${row}`}\\b[^>]*)>.*?</c>`);
+    const match = xml.match(pattern);
+    if (!match) throw new Error(`Checklist answer cell not found: C${row}`);
+    const attributes = match[1].replace(/\s+t="[^"]*"/, '');
+    xml = xml.replace(pattern, `<c${attributes} t="inlineStr"><is><t>${answer}</t></is></c>`);
+  }
   return xml;
 }
 
@@ -233,8 +261,10 @@ async function patchWordDocument(data) {
 
 async function patchChecklist(data) {
   const zip = await loadZip('Cheklist_PM.xlsx');
-  const path = 'xl/sharedStrings.xml';
-  zip.file(path, fillChecklistXml(await zip.file(path).async('string'), data));
+  const sharedStringsPath = 'xl/sharedStrings.xml';
+  const worksheetPath = 'xl/worksheets/sheet1.xml';
+  zip.file(sharedStringsPath, fillChecklistXml(await zip.file(sharedStringsPath).async('string'), data));
+  zip.file(worksheetPath, fillChecklistSheetXml(await zip.file(worksheetPath).async('string'), data));
   return zip.generateAsync({ type: 'blob', compression: 'DEFLATE' });
 }
 
@@ -262,6 +292,7 @@ export {
   documentData,
   fillWordXml,
   fillChecklistXml,
+  fillChecklistSheetXml,
   maintenanceCycle
 };
 
