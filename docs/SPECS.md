@@ -23,7 +23,7 @@ Each month the team lead used to build an Excel planning by hand: which machine 
 
 - generates the monthly PM schedule automatically from machines, assigned technicians and their shift roster;
 - lets the **team lead** review, adjust and **approve** it; technicians see nothing until approval;
-- gives each **technician** a simple dashboard: his shifts of the month, his PMs, and Start / End buttons with exact server timestamps, a note, and photos;
+- gives each **technician** a simple dashboard: his shifts of the month, his PMs, and Start / End buttons with exact server timestamps, structured designation/reference/quantity parts, a note, and photos;
 - gives the team lead the whole schedule in a grid that looks like the Excel (machines × days), plus management of machines, users and accounts.
 
 Nothing fancy: no reports, charts, notifications or offline mode in v1.
@@ -217,7 +217,7 @@ When disabled, show a short reason under the button (for example, when the sched
 - **Photos**: up to 5 (`max_photos_per_pm`). `<input type="file" accept="image/*" capture="environment" multiple>`. Compress client-side (max 1600 px on the long side, JPEG quality 0.8), upload to bucket `pm-photos` at `<pm_task_id>/<uuid>.jpg`, then insert a `pm_photos` row. Show thumbnails (signed URLs), allow delete while in progress.
 
 ### End button
-Enabled only when `in_progress`. RPC `end_pm(task_id, notes)` sets `ended_at = now()`, `status = 'completed'`. Shows the duration afterwards. A completed PM is read-only for the technician.
+Enabled only when `in_progress`. RPC `end_pm(task_id, notes, parts)` sets `ended_at = now()`, `status = 'completed'`, and stores the structured parts array. Shows the duration afterwards. A completed PM is read-only for the technician and exposes downloads/printing for the PM report and checklist.
 
 ### Overdue
 Not started and the night date has passed `latest_allowed_date` → shown red "Overdue" to the technician and the lead. Start is not allowed (no RPC path); the lead moves it to a future night if needed (§8 step 4).
