@@ -39,6 +39,19 @@ async function renderDashboard(profile, serverCtx) {
     .select('*')
     .eq('technician_id', profile.id)
     .gte('shift_date', currentMonthStr);
+  const { data: rosterTechnicians } = await supabase
+    .from('profiles')
+    .select('*')
+    .eq('role', 'technician')
+    .eq('is_active', true)
+    .order('full_name');
+  const [rosterYear, rosterMonth] = currentMonthStr.split('-').map(Number);
+  const rosterDays = new Date(rosterYear, rosterMonth, 0).getDate();
+  const { data: allShiftRows } = await supabase
+    .from('shifts')
+    .select('*')
+    .gte('shift_date', currentMonthStr)
+    .lte('shift_date', `${rosterYear}-${String(rosterMonth).padStart(2, '0')}-${String(rosterDays).padStart(2, '0')}`);
 
   // Fallback to cycle if shifts table row missing
   const generatedNights = new Set(nightsFromCycle(profile, currentMonthStr));
@@ -131,8 +144,9 @@ async function renderDashboard(profile, serverCtx) {
       </a>
     `).join('');
 
+    const firstWeekHighlight = day <= 7 ? 'ring-2 ring-orange-300' : '';
     calendarCells += `
-      <div class="${shiftBg} p-2 rounded-xl min-h-[75px] flex flex-col justify-between transition-all">
+      <div class="${shiftBg} ${firstWeekHighlight} p-2 rounded-xl min-h-[75px] flex flex-col justify-between transition-all">
         <div class="flex items-center justify-between">
           <span class="text-xs font-bold">${day}</span>
           <span class="text-[9px] uppercase tracking-wider opacity-75">${shiftType[0].toUpperCase()}</span>
@@ -164,6 +178,18 @@ async function renderDashboard(profile, serverCtx) {
     taskListRows = `<div class="bg-white p-6 rounded-xl text-center text-sm font-medium text-slate-500">No PM tasks assigned to you this month.</div>`;
   }
 
+  const rosterHeader = Array.from({ length: rosterDays }, (_, index) => `<th class="p-1 text-[9px] text-center min-w-[28px]">${index + 1}</th>`).join('');
+  const rosterRows = (rosterTechnicians || []).map(tech => {
+    const cells = Array.from({ length: rosterDays }, (_, index) => {
+      const date = `${rosterYear}-${String(rosterMonth).padStart(2, '0')}-${String(index + 1).padStart(2, '0')}`;
+      const stored = (allShiftRows || []).find(row => row.technician_id === tech.id && row.shift_date === date);
+      const shift = stored?.shift_type || getCycleShiftForDate(tech, date);
+      const style = shift === 'night' ? 'bg-indigo-100 text-indigo-800' : shift === 'day' ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-400';
+      return `<td class="p-0.5 text-center"><span class="inline-block w-5 h-5 leading-5 rounded text-[9px] font-bold ${style}">${shift[0].toUpperCase()}</span></td>`;
+    }).join('');
+    return `<tr class="border-b border-slate-100"><td class="p-2 text-xs font-bold whitespace-nowrap sticky left-0 bg-white">${tech.full_name}</td>${cells}</tr>`;
+  }).join('');
+
   app.innerHTML = `
     ${bannerHtml}
     ${tonightCardHtml}
@@ -188,6 +214,11 @@ async function renderDashboard(profile, serverCtx) {
     <div class="space-y-3 pt-2">
       <h3 class="text-base font-bold text-slate-900 tracking-tight">My Assigned PM Tasks (${tasks.length})</h3>
       <div class="space-y-2">${taskListRows}</div>
+    </div>
+
+    <div class="bg-white rounded-2xl shadow-sm overflow-hidden">
+      <div class="p-4 border-b border-slate-100"><h3 class="text-base font-bold text-slate-900">Technician Monthly Roster & Shift Cycles (Days 1 - ${rosterDays})</h3></div>
+      <div class="overflow-x-auto"><table class="text-left border-collapse"><thead><tr class="bg-slate-50 border-b border-slate-100"><th class="p-2 text-xs min-w-[150px]">Technician</th>${rosterHeader}</tr></thead><tbody>${rosterRows}</tbody></table></div>
     </div>
   `;
 

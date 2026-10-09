@@ -1,5 +1,6 @@
 // Shared UI Components & Helpers (SPECS §10)
 import { logout } from './auth.js';
+import { supabase } from './supabase-client.js';
 
 export function renderTopBar(containerEl, profile, title = "PM Planner") {
   if (!containerEl) return;
@@ -12,6 +13,7 @@ export function renderTopBar(containerEl, profile, title = "PM Planner") {
       <a href="${rootPath}lead/roster.html" class="top-bar-link px-3 py-1.5 text-xs sm:text-sm font-medium rounded-lg transition-colors ${window.location.pathname.includes('roster') ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-100'}">Roster</a>
       <a href="${rootPath}lead/machines.html" class="top-bar-link px-3 py-1.5 text-xs sm:text-sm font-medium rounded-lg transition-colors ${window.location.pathname.includes('machines') ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-100'}">Machines</a>
       <a href="${rootPath}lead/technicians.html" class="top-bar-link px-3 py-1.5 text-xs sm:text-sm font-medium rounded-lg transition-colors ${window.location.pathname.includes('technicians') ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-100'}">Technicians</a>
+      <a href="${rootPath}lead/grease.html" class="top-bar-link px-3 py-1.5 text-xs sm:text-sm font-medium rounded-lg transition-colors ${window.location.pathname.includes('grease') ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-100'}">Grease</a>
     </div>
   ` : '';
 
@@ -24,6 +26,7 @@ export function renderTopBar(containerEl, profile, title = "PM Planner") {
         </div>
         <div class="top-bar-user flex items-center gap-3 shrink-0">
           <span class="top-bar-name text-xs sm:text-sm font-medium text-slate-600">${profile.full_name}</span>
+          <a href="${rootPath}vibration.html" class="text-xs sm:text-sm font-medium text-slate-600 hover:text-slate-900 px-2 py-1 bg-slate-100 rounded-md">Vibration</a>
           <a href="${rootPath}profile.html" class="text-xs sm:text-sm font-medium text-slate-600 hover:text-slate-900 px-2 py-1 bg-slate-100 rounded-md">Profile</a>
           <button id="logout-btn" class="text-xs sm:text-sm font-medium text-rose-600 hover:text-rose-700 px-2 py-1 bg-rose-50 rounded-md cursor-pointer">Sign Out</button>
         </div>
@@ -35,6 +38,31 @@ export function renderTopBar(containerEl, profile, title = "PM Planner") {
   if (logoutBtn) {
     logoutBtn.addEventListener('click', () => logout());
   }
+
+  if (profile.role === 'team_lead') {
+    renderGreaseNotifications(containerEl);
+  }
+}
+
+async function renderGreaseNotifications(containerEl) {
+  const today = new Date();
+  const limit = new Date(today);
+  limit.setDate(limit.getDate() + 3);
+  const format = date => date.toISOString().slice(0, 10);
+  const { data: records, error } = await supabase
+    .from('xray_generator_grease')
+    .select('next_due_on, machines(code)')
+    .lte('next_due_on', format(limit))
+    .order('next_due_on');
+  if (error) {
+    showToast(`Unable to load grease reminders: ${error.message}`, 'error');
+    return;
+  }
+  if (!records?.length || !containerEl.isConnected) return;
+  const banner = document.createElement('div');
+  banner.className = 'max-w-7xl mx-auto px-4 sm:px-6 pb-3';
+  banner.innerHTML = `<div class="bg-orange-100 border border-orange-200 text-orange-950 p-3 rounded-xl text-xs font-semibold">Grease reminder: ${records.map(record => `${record.machines?.code || 'Machine'} connector must be greased on ${record.next_due_on}`).join(' · ')}</div>`;
+  containerEl.appendChild(banner);
 }
 
 export function renderMustChangePasswordBanner(containerEl) {

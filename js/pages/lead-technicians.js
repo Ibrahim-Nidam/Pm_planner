@@ -93,6 +93,9 @@ async function renderPage(profile) {
           <button data-tech-id="${tech.id}" data-tech-username="${tech.username}" class="reset-pwd-btn px-3 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-900 font-semibold rounded-xl transition-all">
             Reset Password
           </button>
+          <button data-tech-id="${tech.id}" data-tech-name="${tech.full_name}" class="delete-tech-btn px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-900 font-semibold rounded-xl transition-all">
+            Delete
+          </button>
         </td>
       </tr>
     `;
@@ -287,6 +290,23 @@ async function renderPage(profile) {
       } catch (err) {
         showToast(`Update failed: ${err.message}`, "error");
       }
+    });
+
+    document.querySelectorAll('.delete-tech-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        if (!await confirmAction(`Delete ${btn.dataset.techName}? Their account, assignments, and shifts will be removed. Completed PM records will remain linked to their machines with the previous technician name preserved.`, {
+          title: 'Delete technician',
+          confirmLabel: 'Delete technician',
+          danger: true
+        })) return;
+        const { error } = await supabase.rpc('delete_technician', { p_user_id: btn.dataset.techId });
+        if (error) {
+          showToast(`Delete failed: ${error.message}`, 'error');
+          return;
+        }
+        showToast('Technician deleted', 'success');
+        await renderPage(profile);
+      });
     });
   });
 

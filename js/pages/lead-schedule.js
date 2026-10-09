@@ -74,7 +74,8 @@ async function renderPage(profile) {
     for (let d = 1; d <= daysInMonth; d++) {
       const dateStr = `${year}-${String(monthNum).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
       dateHeaders.push(dateStr);
-      calendarHeadersHtml += `<th class="px-1 py-1.5 text-[11px] font-semibold text-slate-600 text-center min-w-[36px] w-[36px]" data-date="${dateStr}">${d}</th>`;
+      const firstWeekClass = d <= 7 ? 'bg-orange-100 text-orange-900' : '';
+      calendarHeadersHtml += `<th class="px-1 py-1.5 text-[11px] font-semibold text-slate-600 text-center min-w-[36px] w-[36px] ${firstWeekClass}" data-date="${dateStr}">${d}</th>`;
       rosterHeadersHtml += `<th class="p-0.5 text-[9px] font-semibold text-slate-600 text-center" data-date="${dateStr}">${d}</th>`;
     }
 
@@ -103,7 +104,7 @@ async function renderPage(profile) {
           const label = is2P ? '2P' : 'PM';
           const bg = matchingTask.status === 'completed' ? 'bg-emerald-600 text-white' : matchingTask.status === 'in_progress' ? 'bg-amber-500 text-white' : matchingTask.source === 'manual' ? 'bg-sky-700 text-white' : 'bg-slate-900 text-white';
           return `
-            <td class="p-1 text-center align-middle grid-cell min-w-[36px] w-[36px]" data-row-id="m-${m.id}" data-machine-id="${m.id}" data-date="${dateStr}">
+            <td class="p-1 text-center align-middle grid-cell min-w-[36px] w-[36px] ${dateStr.slice(-2) <= '07' ? 'bg-orange-50' : ''}" data-row-id="m-${m.id}" data-machine-id="${m.id}" data-date="${dateStr}">
               <button data-task-id="${matchingTask.id}" title="${matchingTask.source === 'manual' ? 'Manual PM' : 'Generated PM'}" class="task-pill w-full h-[20px] text-[9px] font-bold rounded ${bg} shadow-xs hover:opacity-90 cursor-pointer transition-all">
                 ${label}
               </button>
@@ -111,7 +112,7 @@ async function renderPage(profile) {
           `;
         }
         return `
-          <td class="p-1 text-center align-middle grid-cell min-w-[36px] w-[36px] hover:bg-sky-100/60 cursor-pointer group" data-row-id="m-${m.id}" data-machine-id="${m.id}" data-date="${dateStr}" title="Click to manually add PM">
+          <td class="p-1 text-center align-middle grid-cell min-w-[36px] w-[36px] ${dateStr.slice(-2) <= '07' ? 'bg-orange-50' : ''} hover:bg-sky-100/60 cursor-pointer group" data-row-id="m-${m.id}" data-machine-id="${m.id}" data-date="${dateStr}" title="Click to manually add PM">
             <span class="text-[9px] font-bold text-slate-300 opacity-0 group-hover:opacity-100">+</span>
           </td>
         `;

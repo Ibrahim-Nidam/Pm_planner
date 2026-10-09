@@ -79,6 +79,11 @@ async function renderTaskDetails(profile, serverCtx) {
     .select('full_name')
     .eq('id', task.technician_id)
     .maybeSingle();
+  const { data: rotationGrease } = await supabase
+    .from('machine_rotation_grease')
+    .select('grease_counter, current_tour_count')
+    .eq('machine_id', task.machine_id)
+    .maybeSingle();
 
   // Fetch photos
   const { data: photos } = await supabase
@@ -200,6 +205,14 @@ async function renderTaskDetails(profile, serverCtx) {
         <div class="space-y-2">
           <label for="pm-notes" class="block text-xs font-semibold uppercase text-slate-500">Notes</label>
           <textarea id="pm-notes" rows="3" ${task.status === 'completed' || !isOwner ? 'readonly' : ''} placeholder="Additional note..." class="w-full p-4 bg-slate-100 text-slate-900 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-slate-900">${task.notes || ''}</textarea>
+        </div>
+        <div class="space-y-2">
+          <label for="tour-count" class="block text-xs font-semibold uppercase text-slate-500">Machine tour count</label>
+          <input id="tour-count" type="number" min="${rotationGrease?.current_tour_count || 0}" step="1"
+            value="${task.tour_count ?? ''}" ${task.status === 'completed' || !isOwner ? 'readonly' : ''}
+            placeholder="Enter the current tour count"
+            class="w-full p-4 bg-slate-100 text-slate-900 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-slate-900">
+          <p class="text-[10px] text-slate-500">Current stored tour count: ${rotationGrease?.current_tour_count ?? 0}. The value cannot be negative or lower than the stored counter.</p>
         </div>
         ${task.status === 'completed' ? `
           <div class="flex flex-wrap gap-2 pt-2">
@@ -417,10 +430,17 @@ async function renderTaskDetails(profile, serverCtx) {
         endBtn.textContent = "Ending...";
         const finalNotes = document.getElementById('pm-notes')?.value;
         const finalParts = collectParts();
+        const tourCountValue = document.getElementById('tour-count')?.value.trim();
+        const tourCount = tourCountValue === '' ? null : Number(tourCountValue);
+        const previousTourCount = Number(rotationGrease?.current_tour_count || 0);
+        if (tourCount !== null && (!Number.isSafeInteger(tourCount) || tourCount < 0 || tourCount < previousTourCount)) {
+          throw new Error(`Tour count must be an integer of at least ${previousTourCount}`);
+        }
         const { error: rpcErr } = await supabase.rpc('end_pm', {
           p_task_id: task.id,
           p_notes: finalNotes,
-          p_parts: finalParts
+          p_parts: finalParts,
+          p_tour_count: tourCount
         });
         if (rpcErr) throw rpcErr;
         showToast("PM completed successfully", "success");
