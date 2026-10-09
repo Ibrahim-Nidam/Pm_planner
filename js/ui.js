@@ -26,7 +26,6 @@ export function renderTopBar(containerEl, profile, title = "PM Planner") {
         </div>
         <div class="top-bar-user flex items-center gap-3 shrink-0">
           <span class="top-bar-name text-xs sm:text-sm font-medium text-slate-600">${profile.full_name}</span>
-          <a href="${rootPath}vibration.html" class="text-xs sm:text-sm font-medium text-slate-600 hover:text-slate-900 px-2 py-1 bg-slate-100 rounded-md">Vibration</a>
           <a href="${rootPath}profile.html" class="text-xs sm:text-sm font-medium text-slate-600 hover:text-slate-900 px-2 py-1 bg-slate-100 rounded-md">Profile</a>
           <button id="logout-btn" class="text-xs sm:text-sm font-medium text-rose-600 hover:text-rose-700 px-2 py-1 bg-rose-50 rounded-md cursor-pointer">Sign Out</button>
         </div>

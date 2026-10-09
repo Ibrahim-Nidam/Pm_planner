@@ -193,6 +193,161 @@ td.hover-cell {
   display: none;
 }
 
+.eyebrow {
+  color: #64748b;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.vibration-panel,
+.vibration-page-header,
+.grease-page-header {
+  background: #fff;
+  border-radius: 1rem;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.05);
+}
+
+.vibration-panel {
+  overflow: hidden;
+}
+
+.vibration-panel__header,
+.vibration-page-header,
+.grease-page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1.25rem;
+}
+
+.vibration-window {
+  flex: 0 0 auto;
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.6rem;
+  background: #fff7ed;
+  color: #9a3412;
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+.vibration-card {
+  overflow: hidden;
+  border: 1px solid #e2e8f0 !important;
+  border-radius: 0.8rem;
+  background: #fff;
+}
+
+.vibration-status,
+.grease-status {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.35rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.vibration-status--passed,
+.grease-status--ok {
+  background: #ecfdf5;
+  color: #047857;
+}
+
+.vibration-status--failed,
+.grease-status--due {
+  background: #fff1f2;
+  color: #be123c;
+}
+
+.vibration-status--pending,
+.grease-status--soon {
+  background: #fff7ed;
+  color: #c2410c;
+}
+
+.grease-page-header {
+  align-items: flex-start;
+}
+
+.grease-legend {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  color: #64748b;
+  font-size: 0.7rem;
+  font-weight: 600;
+}
+
+.grease-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.grease-dot {
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 999px;
+}
+
+.grease-dot--ok { background: #10b981; }
+.grease-dot--soon { background: #f97316; }
+.grease-dot--due { background: #f43f5e; }
+
+.grease-card {
+  overflow: hidden;
+  border: 1px solid #e2e8f0 !important;
+  border-radius: 1rem;
+  background: #fff;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.04);
+}
+
+.grease-card__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1.25rem;
+}
+
+.grease-section {
+  padding: 1rem 1.25rem;
+}
+
+.grease-section--rotation {
+  background: #f8fafc;
+}
+
+.grease-section--muted {
+  background: #f8fafc;
+}
+
+.grease-section--soon {
+  background: #fffaf5;
+}
+
+.grease-section--ok {
+  background: #f5fdf9;
+}
+
+@media (max-width: 640px) {
+  .vibration-panel__header,
+  .vibration-page-header,
+  .grease-page-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .grease-legend {
+    justify-content: flex-start;
+  }
+}
+
 @media (max-width: 640px) {
   .top-bar-inner {
     align-items: stretch;

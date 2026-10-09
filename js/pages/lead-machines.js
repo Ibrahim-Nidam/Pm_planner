@@ -271,21 +271,7 @@ async function renderPage(profile) {
     const notes = document.getElementById('machine-notes').value.trim() || null;
     const is_active = document.getElementById('machine-is-active').checked;
 
-    // Check if technician changed on existing machine
-    if (id) {
-      const existing = allMachines.find(m => m.id === id);
-      if (existing && existing.technician_id !== technician_id) {
-        // Query if machine has active scheduled PMs
-        const { data: openTasks } = await supabase
-          .from('pm_tasks')
-          .select('id, scheduled_date')
-          .eq('machine_id', id)
-          .eq('status', 'scheduled');
-        if (openTasks && openTasks.length > 0) {
-          showToast(`Warning: Machine ${code} has ${openTasks.length} open PM(s). Remember to update task technician in schedule if needed.`, "warning");
-        }
-      }
-    }
+    const existing = id ? allMachines.find(m => m.id === id) : null;
 
     const payload = {
       code,
@@ -302,6 +288,13 @@ async function renderPage(profile) {
       if (id) {
         const { error } = await supabase.from('machines').update(payload).eq('id', id);
         if (error) throw error;
+        if (existing && existing.technician_id !== technician_id && technician_id) {
+          const { error: taskError } = await supabase.rpc('reassign_machine_pm_tasks', {
+            p_machine_id: id,
+            p_technician_id: technician_id
+          });
+          if (taskError) throw taskError;
+        }
         showToast("Machine updated successfully", "success");
       } else {
         const { error } = await supabase.from('machines').insert([payload]);

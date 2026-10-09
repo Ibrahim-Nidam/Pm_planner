@@ -4,6 +4,7 @@ import { supabase } from '../supabase-client.js';
 import { formatDateDDMMYYYY, formatTime24h, formatDurationMinutes } from '../time.js';
 import { renderTopBar, renderStatusBadge, renderMonthSelector, showToast, openPhotoLightbox, confirmAction } from '../ui.js';
 import { generateSchedule, nightsFromCycle, getCycleShiftForDate, toleranceDate } from '../scheduler.js';
+import { renderVibrationWidget } from '../vibration-widget.js';
 
 let currentMonthStr = '2026-10-01'; // default to acceptance test month
 let activeWarnings = [];
@@ -181,6 +182,7 @@ async function renderPage(profile) {
         </div>
 
         ${warningsHtml}
+        <div id="vibration-widget"></div>
 
         <!-- 1. PM Schedule Matrix Table (Scrollable Detailed Matrix) -->
         <div class="bg-white rounded-2xl p-4 shadow-sm space-y-3">
@@ -284,6 +286,7 @@ async function renderPage(profile) {
         <div id="drawer-panel" class="fixed right-0 top-0 bottom-0 max-w-md w-full bg-white shadow-2xl p-6 overflow-y-auto space-y-6"></div>
       </div>
     `;
+    await renderVibrationWidget(document.getElementById('vibration-widget'), profile);
 
     // Render Month Selector
     renderMonthSelector(document.getElementById('month-selector-container'), currentMonthStr, async (newMonth) => {

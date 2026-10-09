@@ -37,8 +37,7 @@ create table if not exists public.xray_generator_grease (
   performed_on date not null,
   next_due_on date not null,
   performed_by uuid references public.profiles(id) on delete set null,
-  updated_at timestamptz not null default now(),
-  -- Keep each completed greasing session for the five-year retention window.
+  updated_at timestamptz not null default now()
 );
 
 create or replace function public.next_workday(p_date date)
@@ -67,6 +66,7 @@ begin
   values (p_machine_id, p_grease_counter, auth.uid())
   on conflict (machine_id) do update
     set grease_counter = excluded.grease_counter,
+        current_tour_count = greatest(public.machine_rotation_grease.current_tour_count, excluded.grease_counter),
         updated_by = excluded.updated_by,
         updated_at = now()
   returning * into result;
