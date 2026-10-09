@@ -4,6 +4,7 @@ import { supabase } from '../supabase-client.js';
 import { fetchServerContext, initServerTimeSync, formatDateDDMMYYYY } from '../time.js';
 import { renderTopBar, renderMustChangePasswordBanner, renderStatusBadge, renderMonthSelector } from '../ui.js';
 import { nightsFromCycle, getCycleShiftForDate } from '../scheduler.js';
+import { renderVibrationWidget } from '../vibration-widget.js';
 
 let currentMonthStr = new Date().toISOString().slice(0, 7) + '-01';
 
@@ -56,20 +57,21 @@ async function renderDashboard(profile, serverCtx) {
   // Fallback to cycle if shifts table row missing
   const generatedNights = new Set(nightsFromCycle(profile, currentMonthStr));
 
-  // Fetch PM tasks for technician if approved
+  // RLS returns approved tasks assigned to this technician or to their machines.
+  // The machine-owner path keeps existing PMs visible immediately after reassignment.
   let tasks = [];
   if (isApproved && monthRow) {
     const { data: taskRows } = await supabase
       .from('pm_tasks')
       .select('*, machines(code, line)')
       .eq('month_id', monthRow.id)
-      .eq('technician_id', profile.id)
       .order('scheduled_date');
     if (taskRows) tasks = taskRows;
   }
 
   // Show the next task without restricting execution to its planned date.
-  const nextTask = tasks.find(t => t.status === 'in_progress') || tasks.find(t => t.status === 'scheduled');
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const nextTask = tasks.find(t => t.status === 'in_progress') || tasks.find(t => t.status === 'scheduled' && t.scheduled_date >= todayStr);
 
   // Header Banner & Tonight Card
   let bannerHtml = '';
@@ -179,7 +181,7 @@ async function renderDashboard(profile, serverCtx) {
   }
 
   const rosterHeader = Array.from({ length: rosterDays }, (_, index) => `<th class="p-1 text-[9px] text-center min-w-[28px]">${index + 1}</th>`).join('');
-  const rosterRows = (rosterTechnicians || []).map(tech => {
+  const rosterRows = (rosterTechnicians || []).filter(tech => tech.id !== profile.id).map(tech => {
     const cells = Array.from({ length: rosterDays }, (_, index) => {
       const date = `${rosterYear}-${String(rosterMonth).padStart(2, '0')}-${String(index + 1).padStart(2, '0')}`;
       const stored = (allShiftRows || []).find(row => row.technician_id === tech.id && row.shift_date === date);
@@ -200,6 +202,8 @@ async function renderDashboard(profile, serverCtx) {
       <div id="month-selector-container"></div>
     </div>
 
+    <div id="vibration-widget"></div>
+
     <!-- Calendar Grid -->
     <div class="bg-white p-4 rounded-2xl shadow-sm space-y-2">
       <div class="grid grid-cols-7 gap-1 text-center font-bold text-xs text-slate-400 uppercase tracking-wider pb-2 border-b border-slate-100">
@@ -210,16 +214,17 @@ async function renderDashboard(profile, serverCtx) {
       </div>
     </div>
 
+    <div class="bg-white rounded-2xl shadow-sm overflow-hidden">
+      <div class="p-4 border-b border-slate-100"><h3 class="text-base font-bold text-slate-900">Technician Monthly Roster & Shift Cycles (Days 1 - ${rosterDays})</h3><p class="text-xs text-slate-500 mt-1">Other technicians only; your shifts are shown in your calendar above.</p></div>
+      <div class="overflow-x-auto"><table class="text-left border-collapse"><thead><tr class="bg-slate-50 border-b border-slate-100"><th class="p-2 text-xs min-w-[150px]">Technician</th>${rosterHeader}</tr></thead><tbody>${rosterRows || '<tr><td colspan="32" class="p-4 text-sm text-slate-500">No other active technicians.</td></tr>'}</tbody></table></div>
+    </div>
+
     <!-- Task List -->
     <div class="space-y-3 pt-2">
       <h3 class="text-base font-bold text-slate-900 tracking-tight">My Assigned PM Tasks (${tasks.length})</h3>
       <div class="space-y-2">${taskListRows}</div>
     </div>
 
-    <div class="bg-white rounded-2xl shadow-sm overflow-hidden">
-      <div class="p-4 border-b border-slate-100"><h3 class="text-base font-bold text-slate-900">Technician Monthly Roster & Shift Cycles (Days 1 - ${rosterDays})</h3></div>
-      <div class="overflow-x-auto"><table class="text-left border-collapse"><thead><tr class="bg-slate-50 border-b border-slate-100"><th class="p-2 text-xs min-w-[150px]">Technician</th>${rosterHeader}</tr></thead><tbody>${rosterRows}</tbody></table></div>
-    </div>
   `;
 
   if (profile.must_change_password) {
@@ -230,6 +235,7 @@ async function renderDashboard(profile, serverCtx) {
     currentMonthStr = newMonth;
     renderDashboard(profile, serverCtx);
   });
+  await renderVibrationWidget(document.getElementById('vibration-widget'), profile);
 }
 
 init();
