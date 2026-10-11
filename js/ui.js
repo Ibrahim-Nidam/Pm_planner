@@ -1,6 +1,7 @@
 // Shared UI Components & Helpers (SPECS §10)
 import { logout } from './auth.js';
 import { supabase } from './supabase-client.js';
+import { formatDateDDMMYYYY } from './time.js';
 
 export function renderTopBar(containerEl, profile, title = "PM Planner") {
   if (!containerEl) return;
@@ -60,7 +61,7 @@ async function renderGreaseNotifications(containerEl) {
   if (!records?.length || !containerEl.isConnected) return;
   const banner = document.createElement('div');
   banner.className = 'max-w-7xl mx-auto px-4 sm:px-6 pb-3';
-  banner.innerHTML = `<div class="bg-orange-100 border border-orange-200 text-orange-950 p-3 rounded-xl text-xs font-semibold">Grease reminder: ${records.map(record => `${record.machines?.code || 'Machine'} connector must be greased on ${record.next_due_on}`).join(' · ')}</div>`;
+  banner.innerHTML = `<div class="bg-orange-100 border border-orange-200 text-orange-950 p-3 rounded-xl text-xs font-semibold">Grease reminder: ${records.map(record => `${record.machines?.code || 'Machine'} connector must be greased on ${formatDateDDMMYYYY(record.next_due_on)}`).join(' · ')}</div>`;
   containerEl.appendChild(banner);
 }
 

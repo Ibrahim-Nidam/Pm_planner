@@ -235,7 +235,7 @@ async function renderDashboard(profile, serverCtx) {
     currentMonthStr = newMonth;
     renderDashboard(profile, serverCtx);
   });
-  await renderVibrationWidget(document.getElementById('vibration-widget'), profile);
+  await renderVibrationWidget(document.getElementById('vibration-widget'), profile, currentMonthStr);
 }
 
 init();

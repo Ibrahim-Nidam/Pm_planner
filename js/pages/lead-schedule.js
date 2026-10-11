@@ -286,7 +286,7 @@ async function renderPage(profile) {
         <div id="drawer-panel" class="fixed right-0 top-0 bottom-0 max-w-md w-full bg-white shadow-2xl p-6 overflow-y-auto space-y-6"></div>
       </div>
     `;
-    await renderVibrationWidget(document.getElementById('vibration-widget'), profile);
+    await renderVibrationWidget(document.getElementById('vibration-widget'), profile, currentMonthStr);
 
     // Render Month Selector
     renderMonthSelector(document.getElementById('month-selector-container'), currentMonthStr, async (newMonth) => {

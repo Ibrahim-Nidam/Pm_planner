@@ -6,9 +6,13 @@ function monthStart() {
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
 }
 
-export async function renderVibrationWidget(container, profile) {
+function monthLabel(month) {
+  return new Date(`${month}T00:00:00`).toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+}
+
+export async function renderVibrationWidget(container, profile, selectedMonth = monthStart()) {
   if (!container) return;
-  const month = monthStart();
+  const month = selectedMonth;
   const [{ data: machines, error: machineError }, { data: tests, error: testError }] = await Promise.all([
     supabase.from('machines').select('id, code, line').eq('is_active', true).order('sort_order'),
     supabase.from('vibration_tests').select('*').eq('month', month)
@@ -20,8 +24,18 @@ export async function renderVibrationWidget(container, profile) {
 
   const tested = new Map((tests || []).map(test => [test.machine_id, test]));
   const allPassed = machines?.length > 0 && machines.every(machine => tested.get(machine.id)?.result === 'passed');
-  if (!machines?.length || allPassed) {
+  if (!machines?.length) {
     container.innerHTML = '';
+    return;
+  }
+  if (allPassed) {
+    container.innerHTML = `<section class="vibration-panel">
+      <div class="vibration-panel__header">
+        <div><p class="eyebrow">Monthly check</p><h2 class="text-lg font-bold text-slate-900 mt-1">Vibration checks</h2></div>
+        <span class="vibration-window">Days 1–7</span>
+      </div>
+      <div class="m-4 rounded-xl bg-emerald-50 border border-emerald-200 p-4 text-emerald-800"><p class="font-bold">Vibration test for ${monthLabel(month)} has passed.</p><p class="text-xs mt-1">All active machines passed their test for this month.</p></div>
+    </section>`;
     return;
   }
   const cards = (machines || []).map(machine => {
@@ -60,7 +74,7 @@ export async function renderVibrationWidget(container, profile) {
       });
       if (error) showToast(error.message, 'error');
       else showToast('Vibration test saved', 'success');
-      await renderVibrationWidget(container, profile);
+      await renderVibrationWidget(container, profile, month);
     });
   });
 }
