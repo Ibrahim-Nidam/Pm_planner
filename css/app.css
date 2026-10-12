@@ -331,6 +331,10 @@ td.hover-cell {
   background: #fffaf5;
 }
 
+.grease-section--due {
+  background: #fff1f2;
+}
+
 .grease-section--ok {
   background: #f5fdf9;
 }

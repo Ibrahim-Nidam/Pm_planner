@@ -1,5 +1,4 @@
 // Server-time helpers & date formatting (SPECS §9, R7)
-import { supabase } from './supabase-client.js';
 
 let serverContext = {
   now: new Date().toISOString(),
@@ -14,6 +13,7 @@ let serverContext = {
 
 export async function fetchServerContext() {
   try {
+    const { supabase } = await import('./supabase-client.js');
     const { data, error } = await supabase.rpc('get_server_context');
     if (!error && data) {
       const serverNow = new Date(data.now).getTime();
@@ -45,6 +45,13 @@ export function getServerNow() {
 
 export function formatDateDDMMYYYY(dateStr) {
   if (!dateStr) return '';
+  if (typeof dateStr === 'string') {
+    const trimmed = dateStr.trim();
+    if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+      const parts = trimmed.split('-');
+      return `${parts[2]}/${parts[1]}/${parts[0]}`;
+    }
+  }
   const d = new Date(dateStr);
   if (isNaN(d.getTime())) {
     // If string like "YYYY-MM-DD"
@@ -52,7 +59,7 @@ export function formatDateDDMMYYYY(dateStr) {
     if (parts.length === 3) {
       return `${parts[2].padStart(2, '0')}/${parts[1].padStart(2, '0')}/${parts[0]}`;
     }
-    return dateStr;
+    return String(dateStr);
   }
   const day = String(d.getDate()).padStart(2, '0');
   const month = String(d.getMonth() + 1).padStart(2, '0');

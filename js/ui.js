@@ -2,6 +2,7 @@
 import { logout } from './auth.js';
 import { supabase } from './supabase-client.js';
 import { formatDateDDMMYYYY } from './time.js';
+import { getOverdueGreaseRecords, getTodayDateString } from './grease.js';
 
 export function renderTopBar(containerEl, profile, title = "PM Planner") {
   if (!containerEl) return;
@@ -44,25 +45,38 @@ export function renderTopBar(containerEl, profile, title = "PM Planner") {
   }
 }
 
-async function renderGreaseNotifications(containerEl) {
-  const today = new Date();
-  const limit = new Date(today);
-  limit.setDate(limit.getDate() + 3);
-  const format = date => date.toISOString().slice(0, 10);
+export async function renderGreaseNotifications(containerEl) {
+  if (!containerEl) return;
+  const todayStr = getTodayDateString();
   const { data: records, error } = await supabase
     .from('xray_generator_grease')
-    .select('next_due_on, machines(code)')
-    .lte('next_due_on', format(limit))
-    .order('next_due_on');
+    .select('id, machine_id, next_due_on, performed_on, updated_at, machines(code, is_active)')
+    .order('performed_on', { ascending: false })
+    .order('updated_at', { ascending: false });
+
   if (error) {
     showToast(`Unable to load grease reminders: ${error.message}`, 'error');
     return;
   }
-  if (!records?.length || !containerEl.isConnected) return;
-  const banner = document.createElement('div');
+
+  const overdueRecords = getOverdueGreaseRecords(records || [], todayStr);
+  const existingBanner = containerEl.querySelector('#grease-reminder-banner');
+
+  if (!overdueRecords.length) {
+    if (existingBanner) existingBanner.remove();
+    return;
+  }
+
+  if (!containerEl.isConnected) return;
+
+  const banner = existingBanner || document.createElement('div');
+  banner.id = 'grease-reminder-banner';
   banner.className = 'max-w-7xl mx-auto px-4 sm:px-6 pb-3';
-  banner.innerHTML = `<div class="bg-orange-100 border border-orange-200 text-orange-950 p-3 rounded-xl text-xs font-semibold">Grease reminder: ${records.map(record => `${record.machines?.code || 'Machine'} connector must be greased on ${formatDateDDMMYYYY(record.next_due_on)}`).join(' · ')}</div>`;
-  containerEl.appendChild(banner);
+  banner.innerHTML = `<div class="bg-orange-100 border border-orange-200 text-orange-950 p-3 rounded-xl text-xs font-semibold">Grease reminder: ${overdueRecords.map(record => `${record.machines?.code || 'Machine'} connector must be greased on ${formatDateDDMMYYYY(record.next_due_on)}`).join(' · ')}</div>`;
+
+  if (!existingBanner) {
+    containerEl.appendChild(banner);
+  }
 }
 
 export function renderMustChangePasswordBanner(containerEl) {
