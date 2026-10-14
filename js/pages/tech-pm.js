@@ -3,7 +3,7 @@ import { requireRole } from '../guard.js';
 import { supabase } from '../supabase-client.js';
 import { fetchServerContext, initServerTimeSync, formatDateDDMMYYYY, formatTime24h, formatDurationMinutes } from '../time.js';
 import { renderTopBar, renderStatusBadge, showToast, openPhotoLightbox, confirmAction } from '../ui.js';
-import { downloadPmDocuments, printPmDocument, printChecklist } from '../pm-documents.js';
+import { downloadPmDocuments } from '../pm-documents.js';
 
 let taskId = new URLSearchParams(window.location.search).get('id');
 
@@ -217,8 +217,6 @@ async function renderTaskDetails(profile, serverCtx) {
         ${task.status === 'completed' ? `
           <div class="flex flex-wrap gap-2 pt-2">
             <button id="download-docs-btn" class="px-4 py-3 bg-slate-900 text-white rounded-xl text-sm font-bold">Download documents</button>
-            <button id="print-doc-btn" class="px-4 py-3 bg-white text-slate-900 rounded-xl text-sm font-bold shadow-sm">Print PM document</button>
-            <button id="print-checklist-btn" class="px-4 py-3 bg-white text-slate-900 rounded-xl text-sm font-bold shadow-sm">Print checklist</button>
           </div>
         ` : ''}
 
@@ -468,14 +466,6 @@ async function renderTaskDetails(profile, serverCtx) {
     } finally {
       event.currentTarget.disabled = false;
     }
-  });
-  document.getElementById('print-doc-btn')?.addEventListener('click', () => {
-    printPmDocument(task, technician?.full_name)
-      .catch(err => showToast(err.message || 'Could not print document', 'error'));
-  });
-  document.getElementById('print-checklist-btn')?.addEventListener('click', () => {
-    printChecklist(task, technician?.full_name)
-      .catch(err => showToast(err.message || 'Could not print checklist', 'error'));
   });
 }
 
