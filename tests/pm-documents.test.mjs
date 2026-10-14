@@ -35,6 +35,20 @@ test('document fields use full technician name, week number, and cycle', () => {
   assert.equal(data.parts[0].quantity, '1');
 });
 
+test('request date follows the intervention date instead of the planned date', () => {
+  const data = documentData({ ...task, scheduled_date: '2026-10-07', started_at: '2026-10-14T21:05:00', ended_at: '2026-10-14T23:40:00' }, 'Ahmed Benali');
+  assert.equal(data.requestDate.split(' S')[0], '14/10/2026');
+  assert.equal(data.interventionDate.split(' S')[0], '14/10/2026');
+  // The PM period still comes from the planned cycle.
+  assert.equal(data.cycle, 'mensuel');
+});
+
+test('request date falls back to the scheduled date when the PM never started', () => {
+  const data = documentData({ scheduled_date: '2026-10-07', machines: { code: 'K279', line: 'L5' } }, 'Ahmed Benali');
+  assert.equal(data.requestDate.split(' S')[0], '07/10/2026');
+  assert.equal(data.interventionDate, data.requestDate);
+});
+
 test('maintenance cycle follows 2-1-2-1 months from January 2026', () => {
   assert.equal(maintenanceCycle('2026-01-15'), 'mensuel');
   assert.equal(maintenanceCycle('2026-02-15'), 'mensuel');

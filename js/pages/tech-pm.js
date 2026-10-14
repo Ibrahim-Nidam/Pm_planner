@@ -456,8 +456,13 @@ async function renderTaskDetails(profile, serverCtx) {
   document.getElementById('download-docs-btn')?.addEventListener('click', async (event) => {
     event.currentTarget.disabled = true;
     try {
-      await downloadPmDocuments(task, technician?.full_name);
-      showToast('Documents downloaded', 'success');
+      const mode = await downloadPmDocuments(task, technician?.full_name);
+      showToast(
+        mode === 'zip'
+          ? 'Documents downloaded as a single ZIP file'
+          : 'Documents downloaded — tap Allow if your browser asks to save multiple files',
+        'success'
+      );
     } catch (err) {
       showToast(err.message || 'Could not generate documents', 'error');
     } finally {
@@ -469,8 +474,8 @@ async function renderTaskDetails(profile, serverCtx) {
       .catch(err => showToast(err.message || 'Could not print document', 'error'));
   });
   document.getElementById('print-checklist-btn')?.addEventListener('click', () => {
-    try { printChecklist(task, technician?.full_name); }
-    catch (err) { showToast(err.message || 'Could not print checklist', 'error'); }
+    printChecklist(task, technician?.full_name)
+      .catch(err => showToast(err.message || 'Could not print checklist', 'error'));
   });
 }
 

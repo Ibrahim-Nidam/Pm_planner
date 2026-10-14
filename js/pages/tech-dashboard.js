@@ -1,7 +1,7 @@
 // Technician Dashboard Controller (SPECS §10.3)
 import { requireRole } from '../guard.js';
 import { supabase } from '../supabase-client.js';
-import { fetchServerContext, initServerTimeSync, formatDateDDMMYYYY } from '../time.js';
+import { fetchServerContext, initServerTimeSync, formatDateDDMMYYYY, getServerNow } from '../time.js';
 import { renderTopBar, renderMustChangePasswordBanner, renderStatusBadge, renderMonthSelector } from '../ui.js';
 import { nightsFromCycle, getCycleShiftForDate } from '../scheduler.js';
 import { renderVibrationWidget } from '../vibration-widget.js';
@@ -70,7 +70,8 @@ async function renderDashboard(profile, serverCtx) {
   }
 
   // Show the next task without restricting execution to its planned date.
-  const todayStr = new Date().toISOString().slice(0, 10);
+  const serverNow = getServerNow();
+  const todayStr = `${serverNow.getFullYear()}-${String(serverNow.getMonth() + 1).padStart(2, '0')}-${String(serverNow.getDate()).padStart(2, '0')}`;
   const nextTask = tasks.find(t => t.status === 'in_progress') || tasks.find(t => t.status === 'scheduled' && t.scheduled_date >= todayStr);
 
   // Header Banner & Tonight Card
@@ -146,13 +147,16 @@ async function renderDashboard(profile, serverCtx) {
       </a>
     `).join('');
 
-    const firstWeekHighlight = day <= 7 ? 'ring-2 ring-orange-300' : '';
+    const isToday = dayStr === todayStr;
+    const firstWeekHighlight = day <= 7 && !isToday ? 'ring-2 ring-orange-300' : '';
+    const todayHighlight = isToday ? 'ring-2 ring-sky-500 ring-offset-1 shadow-md z-10' : '';
     calendarCells += `
-      <div class="${shiftBg} ${firstWeekHighlight} p-2 rounded-xl min-h-[75px] flex flex-col justify-between transition-all">
-        <div class="flex items-center justify-between">
-          <span class="text-xs font-bold">${day}</span>
+      <div class="${shiftBg} ${todayHighlight} ${firstWeekHighlight} p-2 rounded-xl min-h-[75px] flex flex-col justify-between gap-1 transition-all">
+        <div class="flex items-center justify-between gap-1">
+          <span class="${isToday ? 'text-xs font-black text-sky-700' : 'text-xs font-bold'}">${day}</span>
           <span class="text-[9px] uppercase tracking-wider opacity-75">${shiftType[0].toUpperCase()}</span>
         </div>
+        ${isToday ? '<span class="self-start text-[8px] font-black uppercase tracking-wider bg-sky-600 text-white rounded px-1 py-0.5 leading-none">Today</span>' : ''}
         <div>${pmBadges}</div>
       </div>
     `;

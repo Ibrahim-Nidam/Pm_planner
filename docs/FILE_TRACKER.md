@@ -44,7 +44,7 @@ Update after every change. Status: `stub` / `done` / `tested`.
 | tests/scheduler.test.mjs | tested |
 | tests/pm-documents.test.mjs | tested |
 | docs/FILE_TRACKER.md | done |
-| js/pm-documents.js | done |
+| js/pm-documents.js | tested |
 | supabase/migrations/017_pm_parts.sql | written |
 | docs/PM template.docx | converted fillable copy of PM template.doc |
 | docs/PM template.html | generated from supplied template |
