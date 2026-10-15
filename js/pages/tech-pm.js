@@ -7,6 +7,17 @@ import { downloadPmDocuments } from '../pm-documents.js';
 
 let taskId = new URLSearchParams(window.location.search).get('id');
 
+// Standard PM parts catalog: designation + reference. The technician only ticks
+// the parts used and sets the quantity; the reference is filled automatically.
+const PART_CATALOG = [
+  { designation: 'BRUSH BLACK', reference: '3504-0001' },
+  { designation: 'BRUSH SILVER', reference: '3504-0002' },
+  { designation: 'BRUSH POWER', reference: '3504-0004' },
+  { designation: 'FILTRE, AIR (Porte à Grilles)', reference: '1006416-01' },
+  { designation: 'FILTRE, AIR EVAPORATEUR', reference: '2602-0008' },
+  { designation: 'FAN AXIAL', reference: '2601-0023' }
+];
+
 function escapeAttribute(value) {
   return String(value ?? '')
     .replace(/&/g, '&amp;')
@@ -195,11 +206,8 @@ async function renderTaskDetails(profile, serverCtx) {
 
         <!-- Parts Section -->
         <div class="space-y-2">
-          <div class="flex items-center justify-between">
-            <label class="block text-xs font-semibold uppercase text-slate-500">Parts used</label>
-            ${task.status === 'in_progress' && isOwner ? '<button id="add-part-btn" type="button" class="px-3 py-2 bg-slate-900 text-white rounded-lg text-xs font-bold">Add</button>' : ''}
-          </div>
-          <div id="parts-list" class="space-y-3"></div>
+          <label class="block text-xs font-semibold uppercase text-slate-500">Parts used</label>
+          <div id="parts-list" class="space-y-2"></div>
           <span id="parts-status" class="text-[10px] text-slate-400 font-medium block text-right">${task.status === 'in_progress' && isOwner ? 'Auto-saved' : ''}</span>
         </div>
         <div class="space-y-2">
@@ -249,35 +257,56 @@ async function renderTaskDetails(profile, serverCtx) {
     </div>
   `;
 
-  const initialParts = Array.isArray(task.parts) && task.parts.length ? task.parts : [{}];
+  // Parts state: catalog entries pre-checked from anything already saved on the task.
+  const savedParts = Array.isArray(task.parts) ? task.parts : [];
+  const partsState = PART_CATALOG.map(part => {
+    const saved = savedParts.find(p => (p.reference || '').trim() === part.reference);
+    return {
+      ...part,
+      checked: Boolean(saved),
+      quantity: saved ? (saved.quantity ?? '') : ''
+    };
+  });
+
   const partsList = document.getElementById('parts-list');
+  const isPartsEditable = task.status === 'in_progress' && isOwner;
+
   const renderParts = (parts) => {
     if (!partsList) return;
     partsList.innerHTML = parts.map((part, index) => `
-      <div class="part-row grid grid-cols-1 sm:grid-cols-3 gap-2" data-index="${index}">
-        <input data-part="designation" value="${escapeAttribute(part.designation)}" placeholder="Designation" ${task.status === 'completed' || !isOwner ? 'readonly' : ''} class="part-input w-full p-3 bg-slate-100 rounded-xl text-sm">
-        <input data-part="reference" value="${escapeAttribute(part.reference)}" placeholder="Reference" ${task.status === 'completed' || !isOwner ? 'readonly' : ''} class="part-input w-full p-3 bg-slate-100 rounded-xl text-sm">
-        <input data-part="quantity" value="${escapeAttribute(part.quantity)}" placeholder="Quantity" ${task.status === 'completed' || !isOwner ? 'readonly' : ''} class="part-input w-full p-3 bg-slate-100 rounded-xl text-sm">
+      <div class="part-row flex items-center gap-3 p-3 rounded-xl ${part.checked ? 'bg-slate-100' : 'bg-slate-50'}" data-index="${index}">
+        <input type="checkbox" data-part="used" ${part.checked ? 'checked' : ''} ${!isPartsEditable ? 'disabled' : ''}
+          class="part-check w-5 h-5 rounded border-slate-300 text-slate-900 focus:ring-slate-900 cursor-pointer shrink-0">
+        <label class="flex-1 min-w-0 cursor-pointer">
+          <span class="block text-sm font-semibold ${part.checked ? 'text-slate-900' : 'text-slate-400'}">${part.designation}</span>
+          <span class="block text-[11px] font-medium ${part.checked ? 'text-slate-500' : 'text-slate-300'}">${part.reference}</span>
+        </label>
+        <input type="number" min="1" step="1" data-part="quantity" value="${escapeAttribute(part.quantity)}" placeholder="Qty"
+          ${!part.checked || !isPartsEditable ? 'disabled' : ''}
+          class="part-qty w-20 p-2 bg-white border border-slate-200 rounded-lg text-sm font-bold text-center text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900 disabled:bg-slate-100 disabled:text-slate-300 disabled:border-slate-100">
       </div>
     `).join('');
   };
-  renderParts(initialParts);
+  renderParts(partsState);
 
-  const collectParts = () => [...document.querySelectorAll('.part-row')].map(row => ({
-    designation: row.querySelector('[data-part="designation"]').value.trim(),
-    reference: row.querySelector('[data-part="reference"]').value.trim(),
-    quantity: row.querySelector('[data-part="quantity"]').value.trim()
-  })).filter(part => part.designation || part.reference || part.quantity);
+  const collectParts = () => [...document.querySelectorAll('.part-row')]
+    .filter(row => row.querySelector('[data-part="used"]').checked)
+    .map(row => ({
+      designation: PART_CATALOG[Number(row.dataset.index)].designation,
+      reference: PART_CATALOG[Number(row.dataset.index)].reference,
+      quantity: row.querySelector('[data-part="quantity"]').value.trim()
+    }))
+    .filter(part => part.quantity !== '' && Number(part.quantity) > 0);
 
-  document.getElementById('add-part-btn')?.addEventListener('click', () => {
-    const parts = [...document.querySelectorAll('.part-row')].map(row => ({
-      designation: row.querySelector('[data-part="designation"]').value,
-      reference: row.querySelector('[data-part="reference"]').value,
-      quantity: row.querySelector('[data-part="quantity"]').value
-    }));
-    parts.push({});
-    renderParts(parts);
-    partsList.lastElementChild?.querySelector('input')?.focus();
+  partsList?.addEventListener('change', (e) => {
+    const row = e.target.closest('.part-row');
+    if (!row || !e.target.matches('[data-part="used"]')) return;
+    const index = Number(row.dataset.index);
+    partsState[index].checked = e.target.checked;
+    if (e.target.checked && (partsState[index].quantity === '' || Number(partsState[index].quantity) <= 0)) {
+      partsState[index].quantity = '1';
+    }
+    renderParts(partsState);
   });
 
   // Attach Lightbox triggers
@@ -342,12 +371,16 @@ async function renderTaskDetails(profile, serverCtx) {
       if (statusEl) statusEl.textContent = 'Saved';
     };
     let partsSaveTimeout;
-    partsList?.addEventListener('input', () => {
+    const queuePartsSave = () => {
       clearTimeout(partsSaveTimeout);
       partsSaveTimeout = setTimeout(() => saveParts().catch(() => {
         const statusEl = document.getElementById('parts-status');
         if (statusEl) statusEl.textContent = 'Save error';
       }), 700);
+    };
+    partsList?.addEventListener('input', queuePartsSave);
+    partsList?.addEventListener('change', (e) => {
+      if (e.target.matches('[data-part="used"]')) queuePartsSave();
     });
   }
 
