@@ -12,10 +12,11 @@ export function renderTopBar(containerEl, profile, title = "PM Planner") {
   const leadNav = profile.role === 'team_lead' ? `
     <div class="top-bar-nav flex items-center gap-1 sm:gap-2 overflow-x-auto py-1">
       <a href="${rootPath}lead/schedule.html" class="top-bar-link px-3 py-1.5 text-xs sm:text-sm font-medium rounded-lg transition-colors ${window.location.pathname.includes('schedule') ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-100'}">Schedule</a>
-      <a href="${rootPath}lead/roster.html" class="top-bar-link px-3 py-1.5 text-xs sm:text-sm font-medium rounded-lg transition-colors ${window.location.pathname.includes('roster') ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-100'}">Roster</a>
-      <a href="${rootPath}lead/machines.html" class="top-bar-link px-3 py-1.5 text-xs sm:text-sm font-medium rounded-lg transition-colors ${window.location.pathname.includes('machines') ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-100'}">Machines</a>
-      <a href="${rootPath}lead/technicians.html" class="top-bar-link px-3 py-1.5 text-xs sm:text-sm font-medium rounded-lg transition-colors ${window.location.pathname.includes('technicians') ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-100'}">Technicians</a>
       <a href="${rootPath}lead/grease.html" class="top-bar-link px-3 py-1.5 text-xs sm:text-sm font-medium rounded-lg transition-colors ${window.location.pathname.includes('grease') ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-100'}">Grease</a>
+      <a href="${rootPath}lead/consumption.html" class="top-bar-link px-3 py-1.5 text-xs sm:text-sm font-medium rounded-lg transition-colors ${window.location.pathname.includes('consumption') ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-100'}">Consumption</a>
+      <a href="${rootPath}lead/technicians.html" class="top-bar-link px-3 py-1.5 text-xs sm:text-sm font-medium rounded-lg transition-colors ${window.location.pathname.includes('technicians') ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-100'}">Technicians</a>
+      <a href="${rootPath}lead/machines.html" class="top-bar-link px-3 py-1.5 text-xs sm:text-sm font-medium rounded-lg transition-colors ${window.location.pathname.includes('machines') ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-100'}">Machines</a>
+      <a href="${rootPath}lead/roster.html" class="top-bar-link px-3 py-1.5 text-xs sm:text-sm font-medium rounded-lg transition-colors ${window.location.pathname.includes('roster') ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-100'}">Roster</a>
     </div>
   ` : '';
 

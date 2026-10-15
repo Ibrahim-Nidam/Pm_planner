@@ -4,19 +4,9 @@ import { supabase } from '../supabase-client.js';
 import { fetchServerContext, initServerTimeSync, formatDateDDMMYYYY, formatTime24h, formatDurationMinutes } from '../time.js';
 import { renderTopBar, renderStatusBadge, showToast, openPhotoLightbox, confirmAction } from '../ui.js';
 import { downloadPmDocuments } from '../pm-documents.js';
+import { PART_CATALOG } from '../parts-catalog.js';
 
 let taskId = new URLSearchParams(window.location.search).get('id');
-
-// Standard PM parts catalog: designation + reference. The technician only ticks
-// the parts used and sets the quantity; the reference is filled automatically.
-const PART_CATALOG = [
-  { designation: 'BRUSH BLACK', reference: '3504-0001' },
-  { designation: 'BRUSH SILVER', reference: '3504-0002' },
-  { designation: 'BRUSH POWER', reference: '3504-0004' },
-  { designation: 'FILTRE, AIR (Porte à Grilles)', reference: '1006416-01' },
-  { designation: 'FILTRE, AIR EVAPORATEUR', reference: '2602-0008' },
-  { designation: 'FAN AXIAL', reference: '2601-0023' }
-];
 
 function escapeAttribute(value) {
   return String(value ?? '')
