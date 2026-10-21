@@ -69,10 +69,16 @@ async function renderDashboard(profile, serverCtx) {
     if (taskRows) tasks = taskRows;
   }
 
-  // Show the next task without restricting execution to its planned date.
+  // The card leads with what comes NEXT, not with what was missed: an overdue
+  // PM is surfaced through the calendar (color) and the task list instead, so
+  // the technician always sees the upcoming job first.
   const serverNow = getServerNow();
   const todayStr = `${serverNow.getFullYear()}-${String(serverNow.getMonth() + 1).padStart(2, '0')}-${String(serverNow.getDate()).padStart(2, '0')}`;
-  const nextTask = tasks.find(t => t.status === 'in_progress') || tasks.find(t => t.status === 'scheduled' && t.scheduled_date >= todayStr);
+  const isOverdue = t => t.status === 'scheduled' && t.scheduled_date < todayStr;
+  const upcoming = tasks
+    .filter(t => t.status === 'scheduled' && t.scheduled_date >= todayStr)
+    .sort((a, b) => a.scheduled_date.localeCompare(b.scheduled_date));
+  const nextTask = tasks.find(t => t.status === 'in_progress') || upcoming[0] || null;
 
   // Header Banner & Tonight Card
   let bannerHtml = '';
@@ -97,7 +103,7 @@ async function renderDashboard(profile, serverCtx) {
           </a>
         </div>
       ` : `
-        <p class="text-sm font-medium text-slate-500 pt-1">No PM scheduled for tonight.</p>
+        <p class="text-sm font-medium text-slate-500 pt-1">No upcoming PM this month.</p>
       `}
     </div>
   `;
@@ -141,17 +147,36 @@ async function renderDashboard(profile, serverCtx) {
 
     const dayTasks = tasks.filter(t => t.scheduled_date === dayStr);
 
-    let pmBadges = dayTasks.map(t => `
-      <a href="pm.html?id=${t.id}" class="block mt-1 px-1.5 py-1 text-[10px] font-bold rounded bg-slate-900 text-white truncate hover:bg-slate-800">
-        ${t.machines?.code} ${t.sequence === 2 ? '2P' : 'PM'}
-      </a>
-    `).join('');
+    // Color is the only signal used here (no extra text): rose = overdue,
+    // amber = in progress, emerald = done, dark = still to come. Text and
+    // background color live in the same variant string so no two bg-*/text-*
+    // utilities ever compete on one element.
+    let pmBadges = dayTasks.map(t => {
+      let badge = 'bg-slate-900 text-white hover:bg-slate-800';
+      if (t.status === 'completed') badge = 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200';
+      else if (t.status === 'in_progress') badge = 'bg-amber-400 text-amber-950 hover:bg-amber-500';
+      else if (isOverdue(t)) badge = 'bg-rose-500 text-white hover:bg-rose-600';
+      return `
+        <a href="pm.html?id=${t.id}" class="block mt-1 px-1.5 py-1 text-[10px] font-bold rounded ${badge} truncate">
+          ${t.machines?.code} ${t.sequence === 2 ? '2P' : 'PM'}
+        </a>
+      `;
+    }).join('');
+
+    // Days holding a missed PM get a red frame so nothing stands out louder
+    // than the date itself — visible at a glance, readable without zooming.
+    // Only one ring can win per cell: today > first week > overdue. The frame
+    // is used instead of a background tint on purpose: shiftBg already sets a
+    // background color and two bg-* utilities on one element have no defined
+    // winner, whereas ring-* never conflicts with bg-*.
+    const hasOverdueTask = dayTasks.some(isOverdue);
 
     const isToday = dayStr === todayStr;
     const firstWeekHighlight = day <= 7 && !isToday ? 'ring-2 ring-orange-300' : '';
     const todayHighlight = isToday ? 'ring-2 ring-sky-500 ring-offset-1 shadow-md z-10' : '';
+    const overdueFrame = hasOverdueTask && !isToday && !firstWeekHighlight ? 'ring-2 ring-rose-400' : '';
     calendarCells += `
-      <div class="${shiftBg} ${todayHighlight} ${firstWeekHighlight} p-2 rounded-xl min-h-[75px] flex flex-col justify-between gap-1 transition-all">
+      <div class="${shiftBg} ${overdueFrame} ${todayHighlight} ${firstWeekHighlight} p-2 rounded-xl min-h-[75px] flex flex-col justify-between gap-1 transition-all">
         <div class="flex items-center justify-between gap-1">
           <span class="${isToday ? 'text-xs font-black text-sky-700' : 'text-xs font-bold'}">${day}</span>
           <span class="text-[9px] uppercase tracking-wider opacity-75">${shiftType[0].toUpperCase()}</span>
@@ -173,7 +198,7 @@ async function renderDashboard(profile, serverCtx) {
           </div>
           <div class="flex items-center gap-2">
             <span class="px-2 py-0.5 rounded text-xs font-semibold ${t.source === 'manual' ? 'bg-sky-100 text-sky-800' : 'bg-slate-100 text-slate-700'}">${t.source === 'manual' ? 'Manual' : 'Generated'}</span>
-            ${renderStatusBadge(t.status)}
+            ${renderStatusBadge(t.status, isOverdue(t))}
           </div>
         </div>
       </a>

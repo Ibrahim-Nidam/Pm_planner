@@ -1,7 +1,7 @@
 // Technician PM Execution Page (SPECS §10.4, §9)
 import { requireRole } from '../guard.js';
 import { supabase } from '../supabase-client.js';
-import { fetchServerContext, initServerTimeSync, formatDateDDMMYYYY, formatTime24h, formatDurationMinutes } from '../time.js';
+import { fetchServerContext, initServerTimeSync, formatDateDDMMYYYY, formatTime24h, formatDurationMinutes, getServerNow } from '../time.js';
 import { renderTopBar, renderStatusBadge, showToast, openPhotoLightbox, confirmAction } from '../ui.js';
 import { downloadPmDocuments } from '../pm-documents.js';
 import { PART_CATALOG } from '../parts-catalog.js';
@@ -108,10 +108,21 @@ async function renderTaskDetails(profile, serverCtx) {
   const isTechnician = profile.role === 'technician';
   const isOwner = task.technician_id === profile.id;
   const isApproved = task.schedule_months?.status === 'approved';
+  // Overdue = scheduled day passed and the PM was never started. It stays startable;
+  // the badge only signals the lateness to the technician and the team lead.
+  const serverNow = getServerNow();
+  const todayStr = `${serverNow.getFullYear()}-${String(serverNow.getMonth() + 1).padStart(2, '0')}-${String(serverNow.getDate()).padStart(2, '0')}`;
+  const isOverdue = task.status === 'scheduled' && task.scheduled_date < todayStr;
   // Validation flags for Start Button
   const canStart = isTechnician && isOwner && isApproved && task.status === 'scheduled';
+  // Whether this viewer is allowed to even see the Start button. Role and
+  // ownership are identity gates, not task gates: showing a dead button to a
+  // team lead (or to the wrong technician) reads as "the app is broken", so
+  // those two cases get an explanatory card instead of a disabled button.
+  const canAttemptStart = isTechnician && isOwner;
+  const assignedTechName = technician?.full_name || null;
 
-  // Start disabled reason string
+  // Start disabled reason string — covers the remaining task-level gates only.
   let startDisabledReason = '';
   if (!isApproved) startDisabledReason = 'Schedule is not published yet.';
   else if (task.status !== 'scheduled') startDisabledReason = `Task is ${task.status}.`;
@@ -144,7 +155,7 @@ async function renderTaskDetails(profile, serverCtx) {
           <p class="text-xs font-semibold uppercase tracking-wider text-slate-400 mt-0.5">Line ${task.machines?.line || 'N/A'} &bull; ${task.machines?.location === 'terminal_1' ? 'Terminal 1' : 'Transit'}</p>
         </div>
         <div>
-          ${renderStatusBadge(task.status)}
+          ${renderStatusBadge(task.status, isOverdue)}
         </div>
       </div>
 
@@ -170,10 +181,26 @@ async function renderTaskDetails(profile, serverCtx) {
       <!-- Execution Status Section -->
       ${task.status === 'scheduled' ? `
         <div class="space-y-3 pt-2">
-          <button id="start-pm-btn" ${!canStart ? 'disabled' : ''} class="w-full py-4 bg-slate-900 text-white font-bold rounded-xl text-base shadow-sm hover:bg-slate-800 transition-all disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed">
-            Start PM
-          </button>
-          ${!canStart ? `<p class="text-center text-xs font-medium text-slate-400">${startDisabledReason}</p>` : ''}
+          ${isOverdue ? `
+            <div class="bg-rose-50 p-4 rounded-xl text-rose-900 text-xs sm:text-sm font-medium">
+              This PM was planned for ${formatDateDDMMYYYY(task.scheduled_date)} and is overdue. You can still start and complete it.
+            </div>
+          ` : ''}
+          ${canAttemptStart ? `
+            <button id="start-pm-btn" ${!canStart ? 'disabled' : ''} class="w-full py-4 bg-slate-900 text-white font-bold rounded-xl text-base shadow-sm hover:bg-slate-800 transition-all disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed">
+              Start PM
+            </button>
+            ${!canStart ? `<p class="text-center text-xs font-medium text-slate-400">${startDisabledReason}</p>` : ''}
+          ` : `
+            <div class="bg-slate-50 border border-slate-200 p-4 rounded-xl text-xs sm:text-sm font-medium text-slate-700 space-y-1">
+              <span class="block text-[10px] font-bold uppercase tracking-wider text-slate-400">Start unavailable</span>
+              ${!isTechnician
+                ? `Only the assigned technician can execute a PM. This one belongs to <span class="font-bold text-slate-900">${assignedTechName || 'nobody (unassigned)'}</span>.`
+                : (task.technician_id
+                    ? `This PM is assigned to <span class="font-bold text-slate-900">${assignedTechName || 'another technician'}</span>, so only ${assignedTechName || 'that technician'} can start it.`
+                    : `This PM has no assigned technician yet. Ask the team lead to assign it to you before starting.`)}
+            </div>
+          `}
         </div>
       ` : ''}
 
@@ -205,12 +232,12 @@ async function renderTaskDetails(profile, serverCtx) {
           <textarea id="pm-notes" rows="3" ${task.status === 'completed' || !isOwner ? 'readonly' : ''} placeholder="Additional note..." class="w-full p-4 bg-slate-100 text-slate-900 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-slate-900">${task.notes || ''}</textarea>
         </div>
         <div class="space-y-2">
-          <label for="tour-count" class="block text-xs font-semibold uppercase text-slate-500">Machine tour count</label>
-          <input id="tour-count" type="number" min="${rotationGrease?.current_tour_count || 0}" step="1"
+          <label for="tour-count" class="block text-xs font-semibold uppercase text-slate-500">Machine tour count <span class="text-rose-500">*</span></label>
+          <input id="tour-count" type="number" min="${rotationGrease?.current_tour_count || 0}" step="1" required
             value="${task.tour_count ?? ''}" ${task.status === 'completed' || !isOwner ? 'readonly' : ''}
             placeholder="Enter the current tour count"
             class="w-full p-4 bg-slate-100 text-slate-900 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-slate-900">
-          <p class="text-[10px] text-slate-500">Current stored tour count: ${rotationGrease?.current_tour_count ?? 0}. The value cannot be negative or lower than the stored counter.</p>
+          <p class="text-[10px] text-slate-500">Required to complete the PM. Current stored tour count: ${rotationGrease?.current_tour_count ?? 0}. The value cannot be negative or lower than the stored counter.</p>
         </div>
         ${task.status === 'completed' ? `
           <div class="flex flex-wrap gap-2 pt-2">
@@ -444,6 +471,21 @@ async function renderTaskDetails(profile, serverCtx) {
   const endBtn = document.getElementById('end-pm-btn');
   if (endBtn) {
     endBtn.addEventListener('click', async () => {
+      // Validate the tour count first so the technician is not asked to confirm a PM we cannot save.
+      const tourCountValue = document.getElementById('tour-count')?.value.trim();
+      const previousTourCount = Number(rotationGrease?.current_tour_count || 0);
+      if (tourCountValue === '') {
+        showToast('Tour count is required to complete the PM', 'error');
+        document.getElementById('tour-count')?.focus();
+        return;
+      }
+      const tourCount = Number(tourCountValue);
+      if (!Number.isSafeInteger(tourCount) || tourCount < 0 || tourCount < previousTourCount) {
+        showToast(`Tour count must be an integer of at least ${previousTourCount}`, 'error');
+        document.getElementById('tour-count')?.focus();
+        return;
+      }
+
       if (!await confirmAction('End and complete this PM?', { title: 'Complete PM', confirmLabel: 'Complete PM' })) return;
 
       try {
@@ -451,12 +493,6 @@ async function renderTaskDetails(profile, serverCtx) {
         endBtn.textContent = "Ending...";
         const finalNotes = document.getElementById('pm-notes')?.value;
         const finalParts = collectParts();
-        const tourCountValue = document.getElementById('tour-count')?.value.trim();
-        const tourCount = tourCountValue === '' ? null : Number(tourCountValue);
-        const previousTourCount = Number(rotationGrease?.current_tour_count || 0);
-        if (tourCount !== null && (!Number.isSafeInteger(tourCount) || tourCount < 0 || tourCount < previousTourCount)) {
-          throw new Error(`Tour count must be an integer of at least ${previousTourCount}`);
-        }
         const { error: rpcErr } = await supabase.rpc('end_pm', {
           p_task_id: task.id,
           p_notes: finalNotes,

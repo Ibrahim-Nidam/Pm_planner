@@ -51,3 +51,8 @@ Update after every change. Status: `stub` / `done` / `tested`.
 | docs/PM template_html_3d5960e3.png | generated template asset |
 | docs/PM template_html_e4ea908a.gif | generated template asset |
 | docs/PM template_html_e882d356.png | generated template asset |
+| js/parts-catalog.js | done |
+| js/pages/lead-consumption.js | done |
+| lead/consumption.html | done |
+| supabase/migrations/022_tour_count_required.sql | written |
+| supabase/migrations/023_overdue_start_and_grease_history.sql | written |

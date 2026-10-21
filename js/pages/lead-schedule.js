@@ -94,6 +94,7 @@ async function renderPage(profile) {
     }
 
     // Render PM Schedule Matrix Rows
+    const matrixTodayStr = new Date().toISOString().split('T')[0];
     let matrixRowsHtml = (machines || []).map(m => {
       const assignedTech = technicians?.find(t => t.id === m.technician_id);
       const machineTasks = tasks.filter(t => t.machine_id === m.id);
@@ -103,10 +104,11 @@ async function renderPage(profile) {
         if (matchingTask) {
           const is2P = matchingTask.sequence === 2;
           const label = is2P ? '2P' : 'PM';
-          const bg = matchingTask.status === 'completed' ? 'bg-emerald-600 text-white' : matchingTask.status === 'in_progress' ? 'bg-amber-500 text-white' : matchingTask.source === 'manual' ? 'bg-sky-700 text-white' : 'bg-slate-900 text-white';
+          const taskOverdue = matchingTask.status === 'scheduled' && matchingTask.scheduled_date < matrixTodayStr;
+          const bg = matchingTask.status === 'completed' ? 'bg-emerald-600 text-white' : matchingTask.status === 'in_progress' ? 'bg-amber-500 text-white' : taskOverdue ? 'bg-rose-700 text-white' : matchingTask.source === 'manual' ? 'bg-sky-700 text-white' : 'bg-slate-900 text-white';
           return `
             <td class="p-1 text-center align-middle grid-cell min-w-[36px] w-[36px] ${dateStr.slice(-2) <= '07' ? 'bg-orange-50' : ''}" data-row-id="m-${m.id}" data-machine-id="${m.id}" data-date="${dateStr}">
-              <button data-task-id="${matchingTask.id}" title="${matchingTask.source === 'manual' ? 'Manual PM' : 'Generated PM'}" class="task-pill w-full h-[20px] text-[9px] font-bold rounded ${bg} shadow-xs hover:opacity-90 cursor-pointer transition-all">
+              <button data-task-id="${matchingTask.id}" title="${taskOverdue ? 'Overdue PM — technician can still execute it late' : matchingTask.source === 'manual' ? 'Manual PM' : 'Generated PM'}" class="task-pill w-full h-[20px] text-[9px] font-bold rounded ${bg} shadow-xs hover:opacity-90 cursor-pointer transition-all">
                 ${label}
               </button>
             </td>
@@ -604,6 +606,8 @@ async function openDrawer(task, profile, technicians, shiftRows, monthRow) {
   const panel = document.getElementById('drawer-panel');
 
   const tech = technicians.find(t => t.id === task.technician_id);
+  const todayStr = new Date().toISOString().split('T')[0];
+  const isOverdue = task.status === 'scheduled' && task.scheduled_date < todayStr;
 
   // Fetch photos for task
   const { data: photos } = await supabase
@@ -671,7 +675,8 @@ async function openDrawer(task, profile, technicians, shiftRows, monthRow) {
 
       <div class="space-y-1">
         <span class="text-slate-400 block text-[10px] uppercase font-bold">Execution Status</span>
-        <div>${renderStatusBadge(task.status)}</div>
+        <div>${renderStatusBadge(task.status, isOverdue)}</div>
+        ${isOverdue ? '<p class="text-[11px] text-rose-700 font-semibold mt-1">Overdue: the technician can still execute it late.</p>' : ''}
       </div>
 
       <div class="space-y-1">

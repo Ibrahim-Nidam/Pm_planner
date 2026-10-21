@@ -27,18 +27,27 @@ function rotationState(row) {
 async function renderPage(profile) {
   const app = document.getElementById('app');
   app.innerHTML = '<div class="p-8 text-center text-slate-500">Loading grease records...</div>';
-  const [{ data: machines, error: machineError }, { data: rotation, error: rotationError }, { data: xray, error: xrayError }] = await Promise.all([
+  const [{ data: machines, error: machineError }, { data: rotation, error: rotationError }, { data: xray, error: xrayError }, historyResult] = await Promise.all([
     supabase.from('machines').select('id, code, line').eq('is_active', true).order('sort_order'),
     supabase.from('machine_rotation_grease').select('*'),
-    supabase.from('xray_generator_grease').select('*').order('performed_on', { ascending: false }).order('updated_at', { ascending: false })
+    supabase.from('xray_generator_grease').select('*').order('performed_on', { ascending: false }).order('updated_at', { ascending: false }),
+    // Non-fatal: the history table only exists once migration 023 is applied.
+    supabase.from('rotation_grease_history').select('*').order('recorded_at', { ascending: false })
   ]);
   const firstError = machineError || rotationError || xrayError;
   if (firstError) {
     app.innerHTML = `<div class="p-6 bg-white rounded-2xl text-rose-600 font-semibold">${firstError.message}</div>`;
     return;
   }
+  const greaseHistory = historyResult.data || [];
 
   const rotationMap = new Map((rotation || []).map(row => [row.machine_id, row]));
+  // Last "greased at tour N" events per machine (newest first).
+  const historyMap = new Map();
+  (greaseHistory || []).forEach(row => {
+    if (!historyMap.has(row.machine_id)) historyMap.set(row.machine_id, []);
+    historyMap.get(row.machine_id).push(row);
+  });
   const xrayMap = new Map();
   (xray || []).forEach(row => {
     if (!xrayMap.has(row.machine_id)) xrayMap.set(row.machine_id, []);
@@ -91,6 +100,12 @@ async function renderPage(profile) {
           <div class="text-slate-500">Current tour count<strong class="block mt-2 text-base text-slate-900">${Number(rotationRow?.current_tour_count ?? 0).toLocaleString()}</strong></div>
         </div>
         <button data-save-rotation="${machine.id}" class="save-rotation-btn mt-4 px-3 py-2 bg-slate-900 text-white rounded-lg text-xs font-bold">Save baseline</button>
+        ${(() => {
+          const history = (historyMap.get(machine.id) || []).slice(0, 2);
+          return `<details class="mt-4"><summary class="cursor-pointer text-xs font-semibold text-slate-600">Last ${history.length} grease record${history.length !== 1 ? 's' : ''}</summary><ul class="mt-2">${history.length ? history.map(row => `
+            <li class="flex items-center justify-between gap-2 border-t border-slate-200/70 py-1.5 text-[10px]"><span>Greased at <strong>${formatTourCount(row.greased_at_tour)} tours</strong></span><span class="text-slate-500">${formatDateDDMMYYYY(row.recorded_at)}</span></li>
+          `).join('') : '<li class="text-[10px] text-slate-500">No grease history recorded yet.</li>'}</ul></details>`;
+        })()}
       </div>
       <div class="p-4 ${xrayClass}">
         <div class="flex items-center justify-between gap-2"><div><p class="eyebrow">Calendar-based</p><h4 class="font-semibold text-slate-900 mt-1">X-ray connector</h4></div><span class="text-xs font-semibold ${xrayStatusColor}">${xrayStatusLabel}</span></div>
