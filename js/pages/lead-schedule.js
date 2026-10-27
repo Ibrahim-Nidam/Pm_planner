@@ -303,7 +303,7 @@ async function renderPage(profile) {
         const taskId = btn.dataset.taskId;
         const taskObj = tasks.find(t => t.id === taskId);
         if (taskObj) {
-          await openDrawer(taskObj, profile, technicians, shiftRows, monthRow);
+          await openDrawer(taskObj, profile, technicians, shiftRows, monthRow, tasks);
         }
       });
     });
@@ -601,7 +601,7 @@ function openAddPmModal(machineId, dateStr, machines, technicians) {
   modal.classList.remove('hidden');
 }
 
-async function openDrawer(task, profile, technicians, shiftRows, monthRow) {
+async function openDrawer(task, profile, technicians, shiftRows, monthRow, monthTasks = []) {
   const backdrop = document.getElementById('drawer-backdrop');
   const panel = document.getElementById('drawer-panel');
 
@@ -637,6 +637,29 @@ async function openDrawer(task, profile, technicians, shiftRows, monthRow) {
   });
 
   const sortedNights = Array.from(availableNights).sort();
+
+  // Which night is already taken by another PM (R8: at most 1 PM per night).
+  // pm_tasks has no unique constraint on scheduled_date, so these nights stay
+  // selectable on purpose but are labelled with the machine already on them,
+  // letting the lead see the clash before committing.
+  const nightOccupant = new Map();
+  (monthTasks || []).forEach(t => {
+    if (t.id === task.id) return;
+    const code = t.machines?.code || 'PM';
+    const existing = nightOccupant.get(t.scheduled_date);
+    nightOccupant.set(t.scheduled_date, existing ? `${existing}, ${code}` : code);
+  });
+
+  const nightOptions = sortedNights.map(n => {
+    if (n === task.scheduled_date) {
+      return `<option value="${n}" selected>${formatDateDDMMYYYY(n)} (Current)</option>`;
+    }
+    const occupant = nightOccupant.get(n);
+    if (occupant) {
+      return `<option value="${n}">${formatDateDDMMYYYY(n)} (${occupant})</option>`;
+    }
+    return `<option value="${n}">${formatDateDDMMYYYY(n)}</option>`;
+  }).join('');
 
   let photosHtml = photoUrls.map((p, idx) => `
     <div class="relative group rounded-xl overflow-hidden bg-slate-100 aspect-square shadow-sm cursor-pointer border border-slate-200 hover:border-slate-400 transition-all">
@@ -719,8 +742,9 @@ async function openDrawer(task, profile, technicians, shiftRows, monthRow) {
         <div class="border-t border-slate-100 pt-4 space-y-2">
           <label for="change-date-select" class="block text-xs font-bold uppercase text-slate-900">Change Scheduled Date</label>
           <select id="change-date-select" class="w-full p-3 bg-slate-100 rounded-xl text-sm font-medium focus:outline-none">
-            ${sortedNights.map(n => `<option value="${n}" ${n === task.scheduled_date ? 'selected' : ''}>${formatDateDDMMYYYY(n)} (${n === task.scheduled_date ? 'Current' : 'Night'})</option>`).join('')}
+            ${nightOptions}
           </select>
+          <p class="text-[11px] text-slate-500">Nights already holding a PM are listed with the machine currently on them.</p>
           <button id="save-date-btn" class="w-full py-3 bg-slate-900 text-white font-bold rounded-xl text-xs shadow-sm hover:bg-slate-800 cursor-pointer">
             Update PM Date
           </button>
@@ -771,6 +795,13 @@ async function openDrawer(task, profile, technicians, shiftRows, monthRow) {
       const newDate = document.getElementById('change-date-select').value;
       if (newDate === task.scheduled_date) {
         backdrop.classList.add('hidden');
+        return;
+      }
+
+      // Occupied nights stay selectable, but the lead confirms the clash explicitly.
+      const occupant = nightOccupant.get(newDate);
+      if (occupant
+          && !await confirmAction(`${formatDateDDMMYYYY(newDate)} already has a PM (${occupant}). Move this PM there anyway?`, { title: 'Night already has a PM', confirmLabel: 'Move anyway' })) {
         return;
       }
 
