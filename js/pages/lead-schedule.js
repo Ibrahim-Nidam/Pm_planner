@@ -6,7 +6,8 @@ import { renderTopBar, renderStatusBadge, renderMonthSelector, showToast, openPh
 import { generateSchedule, nightsFromCycle, getCycleShiftForDate, toleranceDate } from '../scheduler.js';
 import { renderVibrationWidget } from '../vibration-widget.js';
 
-let currentMonthStr = '2026-10-01'; // default to acceptance test month
+const now = new Date();
+let currentMonthStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`; // default to the current month
 let activeWarnings = [];
 
 async function init() {

@@ -6,7 +6,8 @@ import { renderTopBar, renderMustChangePasswordBanner, renderStatusBadge, render
 import { nightsFromCycle, getCycleShiftForDate } from '../scheduler.js';
 import { renderVibrationWidget } from '../vibration-widget.js';
 
-let currentMonthStr = new Date().toISOString().slice(0, 7) + '-01';
+const now = new Date();
+let currentMonthStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
 
 async function init() {
   const guard = await requireRole('technician');

@@ -5,7 +5,8 @@ import { formatDateDDMMYYYY } from '../time.js';
 import { renderTopBar, renderMonthSelector, showToast, confirmAction } from '../ui.js';
 import { nightsFromCycle, getCycleShiftForDate } from '../scheduler.js';
 
-let currentMonthStr = '2026-10-01';
+const now = new Date();
+let currentMonthStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`; // default to the current month
 let activeWarnings = [];
 
 async function init() {

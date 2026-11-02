@@ -18,7 +18,10 @@ const monthLabel = monthStr => {
   return `${MONTH_NAMES[month - 1]} ${year}`;
 };
 
-const defaultMonth = () => new Date().toISOString().slice(0, 7);
+const defaultMonth = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+};
 
 // Shift a 'YYYY-MM' string by the given number of months.
 function shiftMonth(monthStr, delta) {
