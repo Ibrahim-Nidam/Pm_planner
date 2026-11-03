@@ -40,7 +40,7 @@ async function renderPage(profile, month) {
   if (allPassed) {
     app.innerHTML = `
       <div class="vibration-page-header">
-        <div><p class="eyebrow">Monthly check</p><h2 class="text-2xl font-bold text-slate-900 mt-1">Vibration tests</h2></div>
+        <div><p class="eyebrow">Monthly check</p><h2 class="text-2xl font-bold text-slate-900 mt-1">Vibration tests (SKF)</h2></div>
         <div id="month-selector" class="shrink-0"></div>
       </div>
       <div class="rounded-2xl bg-emerald-50 border border-emerald-200 p-5 text-emerald-800"><p class="font-bold">Vibration test for ${monthLabel(month)} has passed.</p><p class="text-sm mt-1">All active machines passed their test for this month.</p></div>`;
@@ -64,7 +64,7 @@ async function renderPage(profile, month) {
 
   app.innerHTML = `
     <div class="vibration-page-header">
-      <div><p class="eyebrow">Monthly check</p><h2 class="text-2xl font-bold text-slate-900 mt-1">Vibration tests</h2><p class="text-sm text-slate-500 mt-2 max-w-2xl">Check each active machine during days 1–7.</p></div>
+      <div><p class="eyebrow">Monthly check</p><h2 class="text-2xl font-bold text-slate-900 mt-1">Vibration tests (SKF)</h2><p class="text-sm text-slate-500 mt-2 max-w-2xl">Check each active machine during days 1–7.</p></div>
       <div id="month-selector" class="shrink-0"></div>
     </div>
     <div class="bg-white rounded-2xl shadow-sm overflow-hidden">

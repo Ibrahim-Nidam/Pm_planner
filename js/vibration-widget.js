@@ -31,7 +31,7 @@ export async function renderVibrationWidget(container, profile, selectedMonth = 
   if (allPassed) {
     container.innerHTML = `<section class="vibration-panel">
       <div class="vibration-panel__header">
-        <div><p class="eyebrow">Monthly check</p><h2 class="text-lg font-bold text-slate-900 mt-1">Vibration checks</h2></div>
+        <div><p class="eyebrow">Monthly check</p><h2 class="text-lg font-bold text-slate-900 mt-1">Vibration checks (SKF)</h2></div>
         <span class="vibration-window">Days 1–7</span>
       </div>
       <div class="m-4 rounded-xl bg-emerald-50 border border-emerald-200 p-4 text-emerald-800"><p class="font-bold">Vibration test for ${monthLabel(month)} has passed.</p><p class="text-xs mt-1">All active machines passed their test for this month.</p></div>
@@ -58,7 +58,7 @@ export async function renderVibrationWidget(container, profile, selectedMonth = 
 
   container.innerHTML = `<section class="vibration-panel">
     <div class="vibration-panel__header">
-      <div><p class="eyebrow">Monthly check</p><h2 class="text-lg font-bold text-slate-900 mt-1">Vibration checks</h2><p class="text-sm text-slate-500 mt-1">Record one result for each active machine during the first week.</p></div>
+      <div><p class="eyebrow">Monthly check</p><h2 class="text-lg font-bold text-slate-900 mt-1">Vibration checks (SKF)</h2><p class="text-sm text-slate-500 mt-1">Record one result for each active machine during the first week.</p></div>
       <span class="vibration-window">Days 1–7</span>
     </div>
     <div class="p-4 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">${cards}</div>

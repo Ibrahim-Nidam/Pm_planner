@@ -1,12 +1,14 @@
 import { requireRole } from '../guard.js';
 import { supabase } from '../supabase-client.js';
 import { renderTopBar, showToast, confirmAction } from '../ui.js';
-import { formatDateDDMMYYYY } from '../time.js';
+import { formatDateDDMMYYYY, formatTime24h } from '../time.js';
 
 const today = () => new Date().toISOString().slice(0, 10);
 const escapeAttribute = value => String(value ?? '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 const formatTourCount = value => Number(value || 0).toLocaleString('en-US');
 const formatDate = value => formatDateDDMMYYYY(value);
+// "03/11/2026 14:32" — when the record was last updated.
+const formatDateTime = value => (value ? `${formatDateDDMMYYYY(value)} ${formatTime24h(value)}` : '—');
 
 async function init() {
   const guard = await requireRole('team_lead');
@@ -87,7 +89,7 @@ async function renderPage(profile) {
           const prev = history[i + 1];
           const fromLabel = prev ? formatDateDDMMYYYY(prev.performed_on) : '—';
           const toLabel = formatDateDDMMYYYY(row.performed_on);
-          return `<li class="flex items-center justify-between gap-2 border-t border-slate-200/70 py-1.5 text-[10px]"><span>${fromLabel} → ${toLabel}</span><button data-clear-xray="${row.id}" class="clear-xray-btn text-rose-700 font-bold hover:underline">Clear</button></li>`;
+          return `<li class="flex items-center justify-between gap-2 border-t border-slate-200/70 py-1.5 text-[10px]"><span>${fromLabel} → ${toLabel} <span class="text-slate-500">|| ${formatDateTime(row.updated_at)}</span></span><button data-clear-xray="${row.id}" class="clear-xray-btn text-rose-700 font-bold hover:underline">Clear</button></li>`;
         }).join('')
       : '<li class="text-[10px] text-slate-500">No session history yet.</li>';
 
@@ -103,7 +105,7 @@ async function renderPage(profile) {
         ${(() => {
           const history = (historyMap.get(machine.id) || []).slice(0, 2);
           return `<details class="mt-4"><summary class="cursor-pointer text-xs font-semibold text-slate-600">Last ${history.length} grease record${history.length !== 1 ? 's' : ''}</summary><ul class="mt-2">${history.length ? history.map(row => `
-            <li class="flex items-center justify-between gap-2 border-t border-slate-200/70 py-1.5 text-[10px]"><span>Greased at <strong>${formatTourCount(row.greased_at_tour)} tours</strong></span><span class="text-slate-500">${formatDateDDMMYYYY(row.recorded_at)}</span></li>
+            <li class="flex items-center justify-between gap-2 border-t border-slate-200/70 py-1.5 text-[10px]"><span>Greased at <strong>${formatTourCount(row.greased_at_tour)} tours</strong> <span class="text-slate-500">|| ${formatDateTime(row.recorded_at)}</span></span></li>
           `).join('') : '<li class="text-[10px] text-slate-500">No grease history recorded yet.</li>'}</ul></details>`;
         })()}
       </div>
